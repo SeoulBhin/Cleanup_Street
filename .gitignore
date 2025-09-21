@@ -22,3 +22,5 @@ logs
 .env
 .env.*
 !.env.example
+# 개인 키 파일 무시
+RSA.pem
