@@ -92,6 +92,10 @@ jobs:
               echo "Health check passed!"
               
               echo "Overwriting Nginx config to point to port $TARGET_PORT"
+              
+              # 이전에 사용했던 upstream.conf 파일이 있다면 충돌을 막기 위해 삭제
+              sudo rm -f /etc/nginx/conf.d/upstream.conf
+
               # Nginx 설정을 변수로 정의 (셸 변수 $host 등은 이스케이프 처리)
               NGINX_CONFIG="
               upstream app_server {
