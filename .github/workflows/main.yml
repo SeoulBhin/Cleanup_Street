@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 env:
-  DOCKER_IMAGE: ghcr.io/${{ toLower(github.repository_owner) }}/cleanup_street # <- 이 부분 수정 fix
+  DOCKER_IMAGE: ghcr.io/${{ github.repository_owner.toLowerCase() }}/cleanup_street # <- 이 부분 수정
   VERSION: ${{ github.sha }}
   NAME: go_cicd
 
