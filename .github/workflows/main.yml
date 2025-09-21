@@ -4,17 +4,22 @@ on:
   push:
     branches: [ main ]
 
+# GITHUB_TOKEN에 패키지 쓰기 권한 부여
+permissions:
+  contents: read
+  packages: write
+
 env:
-  # DOCKER_IMAGE 변수는 각 Job에서 동적으로 생성하므로 최상위에서는 삭제합니다.
+  DOCKER_IMAGE: ghcr.io/${{ github.repository_owner.toLowerCase() }}/cleanup_street
   VERSION: ${{ github.sha }}
   NAME: go_cicd
-  REPO_NAME: cleanup_street # 레포지토리 이름을 변수로 지정
+  REPO_NAME: cleanup_street
 
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    outputs: # build job의 결과를 deploy job에 전달하기 위한 설정
+    outputs:
       DOCKER_IMAGE: ${{ steps.docker_meta.outputs.tags }}
     steps:
       - name: Checkout
@@ -22,14 +27,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        
-      # Docker 이미지 메타데이터(태그, 레이블 등)를 생성하는 단계
+
       - name: Docker Meta
         id: docker_meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ env.REPO_NAME }}
-          # Docker 태그 규칙에 맞게 모든 값을 소문자로 변환해주는 옵션
           flavor: |
             latest=true
 
@@ -45,7 +48,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.docker_meta.outputs.tags }} # 여기서 생성된 소문자 태그를 사용
+          tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
 
   deploy:
@@ -62,7 +65,6 @@ jobs:
 
       - name: Deploy to self-hosted runner
         run: |
-          # build job에서 전달받은 소문자 이미지 이름을 사용
           DOCKER_IMAGE=${{ needs.build.outputs.DOCKER_IMAGE }}
           
           docker stop ${{ env.NAME }} || true
