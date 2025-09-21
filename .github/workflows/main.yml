@@ -140,5 +140,13 @@ jobs:
           docker stop $TARGET_CONTAINER_NAME
           docker rm $TARGET_CONTAINER_NAME
           exit 1
+          
+      # =======================================================
+      # 도커 임시파일, 캐시 삭제
+      # =======================================================
+      - name: Clean up Docker resources
+        if: always() # 배포 성공 여부와 관계없이 항상 실행
+        run: |
+          echo "Cleaning up old docker images and build caches..."
+          docker system prune -a -f
 
- 
