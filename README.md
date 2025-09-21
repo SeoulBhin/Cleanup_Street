@@ -8,3 +8,5 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 김명준 - 백엔드(API,DB설계) github - kkmmjj12
 
 이도현 - 풀스택(API설계, API연동) github - di593488-sys
+
+남궁훈 - 프론트엔드(인터페이스 디자인, 데이터연동) github - hoon2436
