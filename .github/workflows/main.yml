@@ -78,6 +78,9 @@ jobs:
 
           echo "Starting new container: $TARGET_CONTAINER_NAME on port $TARGET_PORT"
           
+          # 실패한 이전 배포에서 남은 컨테이너가 있을 수 있으므로 미리 삭제
+          docker rm -f $TARGET_CONTAINER_NAME || true
+
           docker pull $DOCKER_IMAGE
           docker run -d --name $TARGET_CONTAINER_NAME -p $TARGET_PORT:3000 $DOCKER_IMAGE
           
