@@ -21,7 +21,7 @@
     </main>
 
     <footer class="footer">
-      <p>&copy; 2025 Cleanup Street Project. All rights reserved.</p>
+      <p>&copy; 2025 Cleanup Street Capstone project(1) Team(4) Forword. KMU</p>
     </footer>
   </div>
 </template>
