@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 env:
-  DOCKER_IMAGE: ghcr.io/${{ github.actor }}/cleanup_street  # <- 이 부분 수정
+  DOCKER_IMAGE: ghcr.io/${{ github.actor }}/cleanup_street  # <- 이 부분 수정 대문자로 인한 오류
   VERSION: ${{ github.sha }}
   NAME: go_cicd
 
