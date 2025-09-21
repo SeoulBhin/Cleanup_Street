@@ -2,7 +2,7 @@ name: CI/CD Docker
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ] # 'develop' 브랜치를 추가했습니다.
 
 permissions:
   contents: read
@@ -141,3 +141,4 @@ jobs:
           docker rm $TARGET_CONTAINER_NAME
           exit 1
 
+ 
