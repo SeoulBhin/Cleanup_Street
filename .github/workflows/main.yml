@@ -2,7 +2,7 @@ name: CI/CD Docker
 
 on:
   push:
-    branches: [ main, develop ] # 'develop' 브랜치를 추가했습니다.
+    branches: [ main, develop ] # 'develop' 브랜치를 추가
 
 permissions:
   contents: read
@@ -10,7 +10,7 @@ permissions:
 
 env:
   VERSION: ${{ github.sha }}
-  NAME: cleanup-street-app # 컨테이너 이름 (소문자, 하이픈 권장)
+  NAME: cleanup-street-app # 컨테이너 이름 
   REPO_NAME: cleanup_street
 
 jobs:
