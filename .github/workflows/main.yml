@@ -2,7 +2,7 @@ name: CI/CD Docker
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ] # 'develop' 브랜치를 추가
 
 permissions:
   contents: read
@@ -10,7 +10,7 @@ permissions:
 
 env:
   VERSION: ${{ github.sha }}
-  NAME: go_cicd
+  NAME: cleanup-street-app # 컨테이너 이름 
   REPO_NAME: cleanup_street
 
 jobs:
@@ -61,12 +61,83 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy to self-hosted runner
+      - name: Deploy with Zero-Downtime
         run: |
-          # 여러 줄의 태그 목록에서 ':latest'가 포함된 줄만 필터링하여 변수에 저장
           DOCKER_IMAGE=$(echo "${{ needs.build.outputs.DOCKER_IMAGE }}" | grep ':latest')
+          CURRENT_BLUE=$(docker ps -q -f name=${{ env.NAME }}-blue)
           
-          docker stop ${{ env.NAME }} || true
-          docker rm ${{ env.NAME }} || true
+          if [ -z "$CURRENT_BLUE" ]; then
+            TARGET_CONTAINER_NAME="${{ env.NAME }}-blue"
+            TARGET_PORT=3000
+            OLD_CONTAINER_NAME="${{ env.NAME }}-green"
+          else
+            TARGET_CONTAINER_NAME="${{ env.NAME }}-green"
+            TARGET_PORT=3001
+            OLD_CONTAINER_NAME="${{ env.NAME }}-blue"
+          fi
+
+          echo "Starting new container: $TARGET_CONTAINER_NAME on port $TARGET_PORT"
+          
+          # 실패한 이전 배포에서 남은 컨테이너가 있을 수 있으므로 미리 삭제
+          docker rm -f $TARGET_CONTAINER_NAME || true
+
           docker pull $DOCKER_IMAGE
-          docker run -d -p 80:3000 --name ${{ env.NAME }} --restart always $DOCKER_IMAGE
+          docker run -d --name $TARGET_CONTAINER_NAME -p $TARGET_PORT:3000 $DOCKER_IMAGE
+          
+          echo "Waiting for health check..."
+          sleep 10
+
+          for i in {1..10}; do
+            if curl -s http://localhost:$TARGET_PORT > /dev/null; then
+              echo "Health check passed!"
+              
+              echo "Overwriting Nginx config to point to port $TARGET_PORT"
+              
+              # 이전에 사용했던 upstream.conf 파일이 있다면 충돌을 막기 위해 삭제
+              sudo rm -f /etc/nginx/conf.d/upstream.conf
+
+              # Nginx 설정을 변수로 정의 (셸 변수 $host 등은 이스케이프 처리)
+              NGINX_CONFIG="
+              upstream app_server {
+                  server 127.0.0.1:$TARGET_PORT;
+              }
+              server {
+                  listen 80;
+                  server_name _;
+                  location / {
+                      proxy_pass http://app_server;
+                      proxy_set_header Host \$host;
+                      proxy_set_header X-Real-IP \$remote_addr;
+                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto \$scheme;
+                  }
+              }
+              "
+              # 충돌을 막기 위해 메인 설정 파일을 덮어쓰기
+              echo "$NGINX_CONFIG" | sudo tee /etc/nginx/conf.d/cleanup-street.conf
+
+              # 새 설정 테스트 후 Nginx 재시작
+              if sudo nginx -t; then
+                sudo systemctl restart nginx
+              else
+                echo "Nginx configuration test failed. Aborting deployment."
+                exit 1
+              fi
+              
+              if [ ! -z "$OLD_CONTAINER_NAME" ]; then
+                echo "Stopping old container: $OLD_CONTAINER_NAME"
+                docker stop $OLD_CONTAINER_NAME || true
+                docker rm $OLD_CONTAINER_NAME || true
+              fi
+
+              exit 0
+            fi
+            echo "Health check attempt $i failed. Retrying in 5 seconds..."
+            sleep 5
+          done
+          
+          echo "Health check failed. Rolling back."
+          docker stop $TARGET_CONTAINER_NAME
+          docker rm $TARGET_CONTAINER_NAME
+          exit 1
+
