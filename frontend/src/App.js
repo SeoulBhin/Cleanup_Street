@@ -1,12 +1,23 @@
-import React from "react";
-import BackendStatus from "./components/BackendStatus";
-import "./App.css";
+import React, { useState } from "react";
+import axios from "axios";
 
 function App() {
+  const [message, setMessage] = useState("");
+
+  const testApi = async () => {
+    try {
+      const res = await axios.get("/api/hello");
+      setMessage(res.data);
+    } catch (err) {
+      setMessage("❌ 백엔드 연결 실패");
+    }
+  };
+
   return (
-    <div style={{ textAlign: "center", marginTop: "2rem" }}>
-      <h1>Cleanup Street 무중단 배포 테스트</h1>
-      <BackendStatus />
+    <div style={{ textAlign: "center", marginTop: "50px" }}>
+      <h1>Cleanup Street 개발 환경</h1>
+      <button onClick={testApi}>API 연결 테스트</button>
+      <p>{message}</p>
     </div>
   );
 }
