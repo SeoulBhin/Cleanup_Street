@@ -1,0 +1,13 @@
+build
+.gradle
+.idea
+target # Maven 프로젝트의 경우
+src/**/*.java.bak
+src/**/*.kt.bak
+!gradlew
+!gradlew.bat
+.project
+.classpath
+.settings
+tmp/
+.git/
