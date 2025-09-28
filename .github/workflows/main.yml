@@ -162,47 +162,29 @@ jobs:
           sudo mkdir -p /etc/nginx/conf.d
           sudo cp -f /etc/nginx/conf.d/app.conf /etc/nginx/conf.d/app.conf.bak 2>/dev/null || true
 
-          sudo bash -c "cat > /etc/nginx/conf.d/app.conf" <<EOF
+                    sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<'EOL'
 server {
     listen 80;
     server_name _;
 
-    # Backend API
     location /api/ {
         proxy_pass http://127.0.0.1:${BE_NEW_PORT}/;
         proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_buffering off;
     }
 
-    # React Frontend (single-page app)
     location / {
         proxy_pass http://127.0.0.1:${FE_NEW_PORT};
         proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_buffering off;
     }
 }
-EOF
-
-          echo "=== Reload NGINX with sudo ==="
-          sudo nginx -t
-          sudo systemctl reload nginx
-
-          echo "=== Clean old containers ==="
-          docker rm -f ${BE_PREFIX}-${BE_OLD_COLOR} || true
-          docker rm -f ${FE_PREFIX}-${FE_OLD_COLOR} || true
-
-          echo "✅ Done. Now serving BE:${BE_NEW_COLOR}(${BE_NEW_PORT}), FE:${FE_NEW_COLOR}(${FE_NEW_PORT})"
-
-      - name: 📊 Post-Check (optional)
-        run: |
-          echo "Check live endpoints through NGINX:"
-          curl -I http://localhost/
-          curl -I http://localhost/api/hello || true
+EOL
