@@ -44,8 +44,8 @@ jobs:
         push: true # 빌드 후 이미지를 GHCR에 푸시합니다.
         # [수정됨] github.repository_owner를 소문자로 직접 작성합니다.
         tags: ghcr.io/seoulbhin/cleanup-street-react:latest
-        # cache-from: type=gha # GitHub Actions 캐시를 사용하여 빌드 속도를 높입니다.
-        # cache-to: type=gha,mode=max
+        # 캐시 cache-from: type=gha # GitHub Actions 캐시를 사용하여 빌드 속도를 높입니다.
+        # 캐시 cache-to: type=gha,mode=max
 
     # 5. 블루/그린 전략으로 배포: EC2 서버에서 무중단 배포 스크립트를 실행합니다.
     - name: Deploy with Blue/Green Strategy
