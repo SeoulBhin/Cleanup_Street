@@ -21,9 +21,15 @@ export default function BackendStatus() {
   }, []);
 
   return (
-    <div style={{ padding: "1rem", border: `2px solid ${color}`, borderRadius: "8px", margin: "1rem" }}>
+    <div style={{
+      padding: "1rem",
+      border: `2px solid ${color}`,
+      borderRadius: "8px",
+      margin: "1rem",
+      backgroundColor: "#f9f9f9"
+    }}>
       <h3>Spring Backend 상태</h3>
-      <p style={{ color }}>{status}</p>
+      <p style={{ color, fontWeight: "bold" }}>{status}</p>
     </div>
   );
 }
