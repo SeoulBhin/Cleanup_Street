@@ -66,33 +66,29 @@ jobs:
                    -p ${NEW_PORT}:8080 \
                    ghcr.io/seoulbhin/cleanup-street-spring:latest
 
-        echo "Waiting for Spring app on port ${NEW_PORT} to be healthy..."
-        sleep 15
-        for i in {1..5}; do # [디버깅] 시도 횟수를 줄여서 빠르게 실패하도록 함
+        # [최종 디버깅] 컨테이너가 즉시 충돌하는지 확인하기 위해, 헬스 체크 전에 로그를 먼저 확인합니다.
+        echo "Waiting a few seconds for container to initialize or crash..."
+        sleep 10
+
+        echo "--- Container status before health check ---"
+        docker ps -a | grep "cleanup-street-spring-${NEW_COLOR}" || echo "Container not found!"
+
+        echo "--- Early logs from container (if any) ---"
+        docker logs cleanup-street-spring-${NEW_COLOR}
+        echo "--- End of early logs ---"
+
+        echo "Starting health check..."
+        for i in {1..5}; do
           RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${NEW_PORT}/api/hello)
           if [ "$RESPONSE_CODE" -eq 200 ]; then
             echo "Health check passed!"
-            echo "Switching Nginx traffic to port ${NEW_PORT}"
-            echo "upstream spring_servers { server 127.0.0.1:${NEW_PORT}; }" | sudo tee /etc/nginx/conf.d/spring-upstream.conf
-            sudo systemctl reload nginx
-
-            OLD_CONTAINER=$(docker ps -q -f name=cleanup-street-spring-${OLD_COLOR})
-            if [ -n "$OLD_CONTAINER" ]; then
-              echo "Stopping and removing old container: cleanup-street-spring-${OLD_COLOR}"
-              docker stop cleanup-street-spring-${OLD_COLOR}
-              docker rm cleanup-street-spring-${OLD_COLOR}
-            fi
-            echo "Spring Backend Deployment successful!"
-            exit 0
+            # (이하 성공 로직은 생략)
+            exit 0 # 임시로 성공 처리
           fi
           echo "Health check attempt $i failed (HTTP Code: $RESPONSE_CODE). Retrying..."
           sleep 5
         done
         
-        # [디버깅] 헬스 체크 실패 시, 컨테이너를 삭제하지 않고 로그를 출력합니다.
-        echo "Health check failed. Showing container logs for debugging."
-        echo "--- LOGS FOR cleanup-street-spring-${NEW_COLOR} ---"
-        docker logs cleanup-street-spring-${NEW_COLOR}
-        echo "--- END LOGS ---"
+        echo "Health check failed."
         exit 1
 
