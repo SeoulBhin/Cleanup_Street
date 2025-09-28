@@ -9,7 +9,7 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
     env:
-      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/cleanup-street-spring
+      IMAGE_NAME: ghcr.io/seoulbhin/cleanup-street-spring
       CONTAINER_PREFIX: cleanup-street-spring
 
     steps:
