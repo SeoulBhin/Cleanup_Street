@@ -1,5 +1,3 @@
 node_modules
-.git
-.env
 build
-tmp
+.env
