@@ -10,6 +10,6 @@ public class HealthController {
 
     @GetMapping("/hello")
     public String hello() {
-        return "Hello from Backend!";
+        return "백엔드 연결 성공!";
     }
 }
