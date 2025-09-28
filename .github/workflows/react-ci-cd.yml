@@ -105,5 +105,5 @@ jobs:
         echo "Health check failed. Rolling back."
         docker stop cleanup-street-react-${NEW_COLOR}
         docker rm cleanup-street-react-${NEW_COLOR}
-        exit 1 # 실패로 종료
+        exit 1 # 실패로 종료함
 
