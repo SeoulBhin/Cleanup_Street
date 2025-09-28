@@ -22,3 +22,6 @@ CI/CD 구현, 무중단배포 테스트 구현 완료
 DB 연결 X 
 
 김명준 - DB 스키마 작성 완료
+<p align = "center">
+<img width = "75%" alt="스크린샷" src = "https://github.com/user-attachments/assets/b711d256-4a06-45bc-b87a-c9dbd37a9fda">
+</p>
