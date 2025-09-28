@@ -32,7 +32,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_TOKEN }} # 저장소에 등록한 GHCR_TOKEN 시크릿 사용
 
-    # 3. Docker Buildx 설정: 고급 캐싱 기능을 지원하는 Docker 빌드 엔진을 설정합니다.
+    # 3. Docker Buildx 설정: 고급 기능을 지원하는 Docker 빌드 엔진을 설정합니다.
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -42,10 +42,10 @@ jobs:
       with:
         context: ./frontend # Dockerfile이 있는 frontend 폴더를 지정합니다.
         push: true # 빌드 후 이미지를 GHCR에 푸시합니다.
-        # [수정됨] github.repository_owner를 소문자로 직접 작성합니다.
         tags: ghcr.io/seoulbhin/cleanup-street-react:latest
-        # 캐시 cache-from: type=gha # GitHub Actions 캐시를 사용하여 빌드 속도를 높입니다.
-        # 캐시 cache-to: type=gha,mode=max
+        # [최종 수정] GitHub 캐시 서비스 장애를 우회하기 위해 캐시 관련 설정을 비활성화합니다.
+        # cache-from: type=gha
+        # cache-to: type=gha,mode=max
 
     # 5. 블루/그린 전략으로 배포: EC2 서버에서 무중단 배포 스크립트를 실행합니다.
     - name: Deploy with Blue/Green Strategy
@@ -69,7 +69,6 @@ jobs:
         echo "Deploying new React app to ${NEW_COLOR} on EC2 host port ${NEW_PORT}"
         
         # 새 버전의 Docker 이미지를 가져와 새 컨테이너를 실행합니다.
-        # [수정됨] 이미지 경로도 소문자로 변경합니다.
         docker pull ghcr.io/seoulbhin/cleanup-street-react:latest
         docker run -d \
                    --name cleanup-street-react-${NEW_COLOR} \
