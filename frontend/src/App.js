@@ -22,8 +22,9 @@ function App() {
     <div className="App">
       <header className="App-header">
         <h1>React Frontend</h1>
-        <p>Message from Spring Backend: <strong>{message}</strong></p>
-        <p>This is a zero-downtime deployment test!</p>
+        <h3>Spring Backend</h3>
+        <p>Spring Backend: <strong>{message}</strong></p>
+        <p>무중단 배포 테스트!</p>
       </header>
     </div>
   );
