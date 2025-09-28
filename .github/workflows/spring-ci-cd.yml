@@ -35,6 +35,7 @@ jobs:
         tags: |
           ${{ env.IMAGE_NAME }}:${{ github.sha }}
           ${{ env.IMAGE_NAME }}:latest
+
     - name: 🔧 Pre-Deployment Cleanup
       run: |
         echo "🧹 Cleaning up Docker resources..."
@@ -43,6 +44,7 @@ jobs:
         docker volume prune -f
         docker network prune -f
         echo "✅ Cleanup done"
+
     - name: Deploy with Blue/Green Strategy
       env:
         SPRING_PROFILES_ACTIVE: prod
@@ -51,12 +53,12 @@ jobs:
         SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
         JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
         HEALTH_PATH: "/actuator/health"
-        INITIAL_SLEEP: 45       # ⬅ 대기시간 증가
-        RETRIES: 15             # ⬅ 재시도 횟수 증가
+        INITIAL_SLEEP: 20
+        RETRIES: 10
         RETRY_INTERVAL: 5
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        echo "Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
+        echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
 
         EXISTING_BLUE=$(docker ps -q -f name=${CONTAINER_PREFIX}-blue)
         if [ -z "$EXISTING_BLUE" ]; then
@@ -70,56 +72,47 @@ jobs:
         fi
 
         echo "Deploying new version to ${NEW_COLOR} on port ${NEW_PORT}"
-        echo "Old version is ${OLD_COLOR}"
+        docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
 
-        docker rm -f ${CONTAINER_PREFIX}-${NEW_COLOR} || true
-        docker pull ${IMAGE_NAME}:${IMAGE_TAG}
+        docker pull ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
         docker run -d \
-          --name ${CONTAINER_PREFIX}-${NEW_COLOR} \
+          --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
           -p ${NEW_PORT}:8080 \
           -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
           -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
           -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
           -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
           -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
-          ${IMAGE_NAME}:${IMAGE_TAG}
+          ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
-        echo "Waiting ${INITIAL_SLEEP}s for the container to warm up..."
+        echo "⏳ Waiting ${INITIAL_SLEEP}s for the container to warm up..."
         sleep ${INITIAL_SLEEP}
 
-        echo "Starting health check on http://localhost:${NEW_PORT}${HEALTH_PATH}"
         SUCCESS=0
         for i in $(seq 1 ${RETRIES}); do
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}")
           if [ "$HTTP_CODE" -eq 200 ]; then
             echo "✅ Health check passed on attempt $i."
             SUCCESS=1
             break
           fi
-          echo "⚠️ Health check attempt $i failed (HTTP code: $HTTP_CODE). Retrying in ${RETRY_INTERVAL}s..."
+          echo "Health check attempt $i failed (HTTP code: $HTTP_CODE). Retrying in ${RETRY_INTERVAL}s..."
           sleep ${RETRY_INTERVAL}
         done
 
         if [ "$SUCCESS" -ne 1 ]; then
-          echo "❌ Health check failed after ${RETRIES} attempts."
-          echo "--- Last 200 lines of logs from failed container ---"
-          docker logs --tail 200 ${CONTAINER_PREFIX}-${NEW_COLOR} || true
-          echo "--- End of logs ---"
-          docker rm -f ${CONTAINER_PREFIX}-${NEW_COLOR} || true
-          echo "Deployment failed. The old version (${OLD_COLOR}) is still active."
+          echo "❌ Health check failed. Rolling back..."
+          docker logs --tail 200 ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
           exit 1
         fi
 
-        echo "✅ Health check successful. New version is healthy."
-        echo "!!! ACTION REQUIRED: Implement traffic switching logic here. !!!"
-
-        echo "Traffic switched to ${NEW_COLOR}. Cleaning up old container: ${CONTAINER_PREFIX}-${OLD_COLOR}"
-        docker rm -f ${CONTAINER_PREFIX}-${OLD_COLOR} || true
-        # 7. Switch Traffic
-        echo "Switching Nginx to new container on port ${NEW_PORT}"
-        sudo sed -i "s|proxy_pass http://127.0.0.1:[0-9]\+;|proxy_pass http://127.0.0.1:${NEW_PORT};|" /etc/nginx/conf.d/app.conf
+        echo "✅ New container is healthy, switching Nginx..."
+        sudo sed -i "s|127.0.0.1:[0-9]\+|127.0.0.1:${NEW_PORT}|" /etc/nginx/conf.d/spring-upstream.conf
         sudo nginx -t && sudo systemctl reload nginx
-        echo "Nginx reloaded successfully, now serving ${NEW_COLOR}."
 
-        echo "🎉 Blue/Green Deployment successful."
+        echo "🧹 Cleaning up old container: ${CONTAINER_PREFIX}-${OLD_COLOR}"
+        docker rm -f ${{ env.CONTAINER_PREFIX }}-${OLD_COLOR} || true
+
+        echo "🎉 Deployment complete and Nginx switched to ${NEW_COLOR} (port ${NEW_PORT})"
