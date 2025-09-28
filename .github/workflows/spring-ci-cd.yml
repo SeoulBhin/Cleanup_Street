@@ -4,7 +4,7 @@ name: Spring Backend CI/CD (Blue/Green)
 # 워크플로우 실행 조건을 정의합니다.
 on:
   push:
-    branches:
+    branches: 
       - main
   workflow_dispatch:
 
