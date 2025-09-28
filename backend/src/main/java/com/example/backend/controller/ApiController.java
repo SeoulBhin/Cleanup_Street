@@ -10,6 +10,6 @@ public class ApiController {
 
     @GetMapping("/hello")
     public String hello() {
-        return "Hello from Spring Boot Backend v2.0!";
+        return "Hello from Spring Boot Backend v2.0!"; // test
     }
 }
