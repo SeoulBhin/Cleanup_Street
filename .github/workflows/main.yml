@@ -160,31 +160,31 @@ jobs:
           echo "=== Generate NGINX app.conf dynamically ==="
           # 단일 app.conf를 재생성: /api -> Backend(New), / -> Frontend(New)
           sudo mkdir -p /etc/nginx/conf.d
-          sudo cp -f /etc/nginx/conf.d/app.conf /etc/nginx/conf.d/app.conf.bak 2>/dev/null || true
+                    sudo cp -f /etc/nginx/conf.d/app.conf /etc/nginx/conf.d/app.conf.bak 2>/dev/null || true
+          sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<EOL
 
-                    sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<'EOL'
-server {
-    listen 80;
-    server_name _;
+            server {
+                listen 80;
+                server_name _;
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:${BE_NEW_PORT}/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_buffering off;
-    }
+            location /api/ {
+                proxy_pass http://127.0.0.1:${BE_NEW_PORT}/;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_buffering off;
+            }
 
-    location / {
-        proxy_pass http://127.0.0.1:${FE_NEW_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_buffering off;
-    }
-}
-EOL
+            location / {
+                proxy_pass http://127.0.0.1:${FE_NEW_PORT};
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_buffering off;
+            }
+            }
+                        EOL
