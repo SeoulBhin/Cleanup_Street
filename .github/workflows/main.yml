@@ -40,6 +40,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -157,22 +163,21 @@ jobs:
             exit 1
           fi
 
-          echo "=== Generate NGINX app.conf dynamically ==="
-          # 단일 app.conf를 재생성: /api -> Backend(New), / -> Frontend(New)
+                    echo "=== Generate NGINX app.conf dynamically ==="
           sudo mkdir -p /etc/nginx/conf.d
-                    sudo cp -f /etc/nginx/conf.d/app.conf /etc/nginx/conf.d/app.conf.bak 2>/dev/null || true
-          sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<EOL
+          sudo cp -f /etc/nginx/conf.d/app.conf /etc/nginx/conf.d/app.conf.bak 2>/dev/null || true
 
-            server {
-                listen 80;
-                server_name _;
+          sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<EOL
+          server {
+            listen 80;
+            server_name _;
 
             location /api/ {
                 proxy_pass http://127.0.0.1:${BE_NEW_PORT}/;
                 proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header Upgrade \$http_upgrade;
                 proxy_set_header Connection "upgrade";
                 proxy_buffering off;
             }
@@ -180,11 +185,15 @@ jobs:
             location / {
                 proxy_pass http://127.0.0.1:${FE_NEW_PORT};
                 proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header Upgrade \$http_upgrade;
                 proxy_set_header Connection "upgrade";
                 proxy_buffering off;
             }
             }
-                        EOL
+                EOL
+
+                echo "=== Reload Nginx ==="
+                sudo nginx -t
+                sudo systemctl reload nginx
