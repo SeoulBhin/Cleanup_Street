@@ -30,7 +30,7 @@ jobs:
       with:
         context: ./frontend # Dockerfile이 있는 frontend 폴더 지정
         push: true
-        tags: ghcr.io/${{ github.repository_owner }}/your-react-app:latest # GHCR에 푸시될 이미지 이름:태그
+        tags: ghcr.io/${{ github.repository_owner }}/Cleanup_Street:latest # GHCR에 푸시될 이미지 이름:태그
         cache-from: type=gha # GitHub Actions 캐싱을 사용하여 빌드 속도 향상
         cache-to: type=gha,mode=max
 
@@ -64,11 +64,11 @@ jobs:
         echo "Deploying new React app to ${NEW_COLOR} environment on EC2 host port ${NEW_PORT}"
         
         # 3. 새 버전의 Docker 이미지 풀(Pull) 및 컨테이너 실행
-        docker pull ghcr.io/${{ github.repository_owner }}/your-react-app:latest
+        docker pull ghcr.io/${{ github.repository_owner }}/Cleanup_Street:latest
         docker run -d \
                    --name react-app-${NEW_COLOR} \
                    -p ${NEW_PORT}:80 \
-                   ghcr.io/${{ github.repository_owner }}/your-react-app:latest
+                   ghcr.io/${{ github.repository_owner }}/Cleanup_Street:latest
         
         # 4. 헬스 체크: 새 컨테이너가 정상적으로 시작될 때까지 대기
         echo "Waiting for React app on port ${NEW_PORT} to be healthy..."
