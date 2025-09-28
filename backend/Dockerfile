@@ -2,22 +2,22 @@ FROM gradle:jdk17-alpine AS builder
 
 WORKDIR /app
 
-#  Gradle 설정 파일과 소스 코드를 복사
+# gradlew & gradle 폴더 & build.gradle & settings.gradle & 소스 복사
+COPY gradlew .
+COPY gradle ./gradle
 COPY build.gradle settings.gradle ./
 COPY src ./src
 
-# Gradle을 사용하여 실행 가능한 JAR 파일을 빌드
-RUN ./gradlew bootJar
+# gradlew 실행 권한 부여
+RUN chmod +x ./gradlew
 
-#  최적화된 OpenJDK 런타임 이미지를 사용
+# JAR 빌드
+RUN ./gradlew --no-daemon clean bootJar
+
+# 실행 스테이지
 FROM openjdk:17-jdk-slim-buster
 
 WORKDIR /app
+COPY --from=builder /app/build/libs/*.jar app.jar
 
-# 빌드 스테이지에서 생성된 JAR 파일을 최종 이미지로 복사
-COPY --from=builder /app/build/libs/*.jar app.jar 
-
-# 스프링부트 기본 포트 8080
-EXPOSE 8080
-
-CMD ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
