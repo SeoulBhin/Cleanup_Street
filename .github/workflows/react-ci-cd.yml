@@ -24,6 +24,8 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }} # GitHub 사용자 이름
         password: ${{ secrets.GHCR_TOKEN }} # 위에서 설정한 GitHub Secret 사용
+    - name: Set up Docker Buildx
+      uses: docker/setup-build-action@v3
 
     - name: Build and push React Docker image
       uses: docker/build-push-action@v4 # Docker 이미지 빌드 및 GHCR에 푸시

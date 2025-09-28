@@ -17,6 +17,9 @@ jobs:
 
     # ... (Docker Buildx, GHCR Login 단계는 이전과 동일) ...
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-build-action@v3
+      
     - name: Build and push Spring Docker image
       uses: docker/build-push-action@v4
       with:
