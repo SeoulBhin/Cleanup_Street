@@ -11,17 +11,20 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 
 남궁훈 - 프론트엔드(UI/UX) github - hoon2436
 
-- 0928 -
-서버
-백엔드 - 스프링
-프론트 - 리엑트
-CI/CD 구현, 무중단배포 테스트 중
+0928
+---
 
-- 0929 -
-CI/CD 구현, 무중단배포 테스트 구현 완료
-DB 연결 X 
+김경빈
+- 서버 백엔드 - 스프링, 프론트 - 리엑트 
+- CI/CD 구현, 무중단배포 테스트 중
 
-김명준 - DB 스키마 작성 완료
+0929
+---
+김경빈
+- CI/CD 구현, 무중단배포 테스트 구현 완료(DB 연결 X)
+
+김명준 
+- DB 스키마 작성 완료
 <p align = "center">
 <img width = "75%" alt="스크린샷" src = "https://github.com/user-attachments/assets/b711d256-4a06-45bc-b87a-c9dbd37a9fda">
 </p>
