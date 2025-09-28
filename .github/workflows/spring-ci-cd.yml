@@ -4,7 +4,7 @@ name: Spring Backend CI/CD (Blue/Green)
 # 워크플로우 실행 조건을 정의합니다.
 on:
   push:
-    branches: 
+    branches:
       - main
   workflow_dispatch:
 
@@ -59,6 +59,10 @@ jobs:
         fi
 
         echo "Deploying new Spring app to ${NEW_COLOR} on EC2 host port ${NEW_PORT}"
+        
+        # [수정됨] 새 컨테이너를 실행하기 전에, 이름 충돌을 방지하기 위해
+        # 같은 이름의 기존 컨테이너가 있다면 강제로 삭제합니다.
+        docker rm -f cleanup-street-spring-${NEW_COLOR} || true
         
         docker pull ghcr.io/seoulbhin/cleanup-street-spring:latest
         docker run -d \
