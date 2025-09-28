@@ -1,114 +1,131 @@
 name: Spring Backend CI/CD (Blue/Green)
 
-on: push: branches: [ main ] workflow_dispatch:
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-jobs: build-and-deploy: runs-on: self-hosted
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/cleanup-street-spring
+      CONTAINER_PREFIX: cleanup-street-spring
 
-steps:
-- name: Checkout code
-  uses: actions/checkout@v3
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-- name: Login to GitHub Container Registry
-  uses: docker/login-action@v2
-  with:
-    registry: ghcr.io
-    username: ${{ github.actor }}
-    password: ${{ secrets.GHCR_TOKEN }}
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
 
-- name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-- name: Build and push Spring Docker image
-  uses: docker/build-push-action@v4
-  with:
-    context: ./backend
-    push: true
-    tags: ghcr.io/seoulbhin/cleanup-street-spring:latest
+    - name: Build and push Spring Docker image
+      id: build_and_push
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: |
+          ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.IMAGE_NAME }}:latest
 
-- name: Deploy with Blue/Green Strategy
-  env:
-    # 애플리케이션 환경
-    SPRING_PROFILES_ACTIVE: prod
-    SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
-    SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
-    SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
-    # 필요 시 추가(예: Redis, 외부 API 키 등)
-    # REDIS_HOST: ${{ secrets.REDIS_HOST }}
-    # REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-    # JVM 옵션(메모리 최적화 등)
-    JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
-    # 헬스 체크 엔드포인트와 대기/재시도 설정
-    HEALTH_PATH: "/actuator/health"
-    INITIAL_SLEEP: "25"
-    RETRIES: "10"
-    RETRY_INTERVAL: "5"
-  run: |
-    echo "Starting Spring Backend Blue/Green Deployment..."
+    - name: Deploy with Blue/Green Strategy
+      env:
+        # Application Environment
+        SPRING_PROFILES_ACTIVE: prod
+        SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+        SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+        SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+        # JVM Options (Memory Optimization)
+        JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+        # Health Check Configuration
+        HEALTH_PATH: "/actuator/health"
+        INITIAL_SLEEP: 25
+        RETRIES: 10
+        RETRY_INTERVAL: 5
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
 
-    # 현재 blue가 돌아중인지 확인
-    EXISTING_BLUE=$(docker ps -q -f name=cleanup-street-spring-blue)
+        # 1. Determine which color is active and which is inactive
+        EXISTING_BLUE=$(docker ps -q -f name=${CONTAINER_PREFIX}-blue)
+        if [ -z "$EXISTING_BLUE" ]; then
+          NEW_COLOR="blue"
+          OLD_COLOR="green"
+          NEW_PORT=9090
+        else
+          NEW_COLOR="green"
+          OLD_COLOR="blue"
+          NEW_PORT=9091
+        fi
 
-    if [ -z "$EXISTING_BLUE" ]; then
-      NEW_COLOR="blue"
-      OLD_COLOR="green"
-      NEW_PORT=9090
-    else
-      NEW_COLOR="green"
-      OLD_COLOR="blue"
-      NEW_PORT=9091
-    fi
+        echo "Deploying new version to ${NEW_COLOR} on port ${NEW_PORT}"
+        echo "Old version is ${OLD_COLOR}"
 
-    echo "Deploying new Spring app to ${NEW_COLOR} on host port ${NEW_PORT}"
+        # 2. Stop and remove any stale container for the new color
+        docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
 
-    # 새 슬롯 컨테이너 제거(이름 충돌 방지)
-    docker rm -f cleanup-street-spring-${NEW_COLOR} || true
+        # 3. Pull the specific image for this commit
+        docker pull ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
-    # 최신 이미지 가져오기
-    docker pull ghcr.io/seoulbhin/cleanup-street-spring:latest
+        # 4. Run the new container
+        docker run -d \
+          --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
+          -p ${NEW_PORT}:8080 \
+          -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
+          -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
+          -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
+          -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
+          -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
+          ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
-    # 새 컨테이너 실행(필수 환경변수 주입)
-    docker run -d \
-      --name cleanup-street-spring-${NEW_COLOR} \
-      -p ${NEW_PORT}:8080 \
-      -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
-      -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
-      -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
-      -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
-      -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
-      ghcr.io/seoulbhin/cleanup-street-spring:latest
+        echo "Waiting ${INITIAL_SLEEP}s for the container to warm up..."
+        sleep ${INITIAL_SLEEP}
 
-    echo "Waiting ${INITIAL_SLEEP}s for the container to warm up..."
-    sleep ${INITIAL_SLEEP}
+        # 5. Health Check
+        echo "Starting health check on http://localhost:${NEW_PORT}${HEALTH_PATH}"
+        SUCCESS=0
+        for i in $(seq 1 ${RETRIES}); do
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}")
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "Health check passed on attempt $i."
+            SUCCESS=1
+            break
+          fi
+          echo "Health check attempt $i failed (HTTP code: $HTTP_CODE). Retrying in ${RETRY_INTERVAL}s..."
+          sleep ${RETRY_INTERVAL}
+        done
 
-    echo "--- Container status before health check ---"
-    docker ps -a | grep "cleanup-street-spring-${NEW_COLOR}" || echo "Container not found!"
+        # 6. Handle Health Check Failure (Rollback)
+        if [ "$SUCCESS" -ne 1 ]; then
+          echo "Health check failed after ${RETRIES} attempts."
+          echo "--- Last 200 lines of logs from failed container ---"
+          docker logs --tail 200 ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          echo "--- End of logs ---"
+          echo "Stopping and removing the failed container: ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR}"
+          docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          echo "Deployment failed. The old version (${OLD_COLOR}) is still active."
+          exit 1
+        fi
 
-    echo "--- Early logs from container (if any) ---"
-    docker logs --tail 200 cleanup-street-spring-${NEW_COLOR} || true
-    echo "--- End of early logs ---"
+        # 7. Switch Traffic (Placeholder)
+        echo "Health check successful. New version is healthy."
+        echo "!!! ACTION REQUIRED: Implement traffic switching logic here. !!!"
+        echo "For example, update Nginx config to point to port ${NEW_PORT}, then reload."
+        # Example:
+        # sed -i "s/proxy_pass http:\/\/127.0.0.1:[0-9]\+;/proxy_pass http:\/\/127.0.0.1:${NEW_PORT};/" /etc/nginx/conf.d/app.conf
+        # systemctl reload nginx
+        # sleep 5 # Allow time for connections to drain from the old instance
 
-    echo "Starting health check on http://localhost:${NEW_PORT}${HEALTH_PATH}"
-    SUCCESS=0
-    for i in $(seq 1 ${RETRIES}); do
-      CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}")
-      if [ "$CODE" -eq 200 ]; then
-        echo "Health check passed on attempt $i"
-        SUCCESS=1
-        break
-      fi
-      echo "Health check attempt $i failed (HTTP $CODE). Retrying in ${RETRY_INTERVAL}s..."
-      sleep ${RETRY_INTERVAL}
-    done
+        # 8. Clean up the old container (after successful traffic switch)
+        echo "Traffic switched to ${NEW_COLOR}. Cleaning up old container: ${CONTAINER_PREFIX}-${OLD_COLOR}"
+        docker rm -f ${{ env.CONTAINER_PREFIX }}-${OLD_COLOR} || true
 
-    if [ "$SUCCESS" -ne 1 ]; then
-      echo "Health check failed. Showing last 200 logs:"
-      docker logs --tail 200 cleanup-street-spring-${NEW_COLOR} || true
-      echo "Stopping and removing the failed ${NEW_COLOR} container."
-      docker rm -f cleanup-street-spring-${NEW_COLOR} || true
-      exit 1
-    fi
-
-    echo "New ${NEW_COLOR} is healthy. (전환/롤백 로직은 환경에 맞게 구현하세요)"
-    # 예: Nginx 프록시 포트 스위치/심볼릭 링크 전환/로드밸런서 타깃 그룹 변경 등
-    # 전환 성공 후 이전 슬롯 정리:
-    # docker rm -f cleanup-street-spring-${OLD_COLOR} || true
+        echo "Blue/Green Deployment successful."
