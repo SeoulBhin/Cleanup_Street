@@ -2,14 +2,14 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 function App() {
-  const [message, setMessage] = useState("⏳ 백엔드 연결 확인 중...");
+  const [message, setMessage] = useState("⏳ 백엔드 연결 확인 중");
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     axios
       .get("/api/hello")
       .then((res) => {
-        setMessage("✅ 백엔드 연결 성공: " + res.data);
+        setMessage("✅ 백엔드 드디어 연결 성공: " + res.data);
         setStatus("success");
       })
       .catch(() => {
@@ -24,7 +24,7 @@ function App() {
       textAlign: "center",
       marginTop: "50px"
     }}>
-      <h1>Cleanup Street 테스트 페이지</h1>
+      <h1>CI / CD 무중단 배포 테스트</h1>
       <p style={{
         fontSize: "1.2rem",
         fontWeight: "bold",
