@@ -6,10 +6,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api")
-public class ApiController {
+public class ApiController { 
 
     @GetMapping("/hello")
     public String hello() {
-        return "Hello from Spring Boot Backend v1.0!";
+        return "Hello from Spring Boot Backend v2.0!";
     }
 }
