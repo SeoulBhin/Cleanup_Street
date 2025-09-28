@@ -9,6 +9,7 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
     env:
+      # 공통 변수
       BE_IMAGE: ghcr.io/seoulbhin/cleanup-street-spring
       FE_IMAGE: ghcr.io/seoulbhin/cleanup-street-react
       BE_PREFIX: cleanup-street-spring
@@ -51,10 +52,15 @@ jobs:
             ${{ env.FE_IMAGE }}:${{ github.sha }}
             ${{ env.FE_IMAGE }}:latest
 
-      - name: Deploy Blue/Green
+      - name: Deploy with Blue/Green Strategy
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          SPRING_PROFILES_ACTIVE: prod
+          JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
         run: |
-          set -euo pipefail
-          # Decide colors
+          echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
+
+          # Decide next colors
           BE_EXISTING=$(docker ps -q -f name=${BE_PREFIX}-blue || true)
           if [ -z "$BE_EXISTING" ]; then
             BE_NEW_COLOR=blue; BE_NEW_PORT=${BE_BLUE_PORT}; BE_OLD_COLOR=green
@@ -69,29 +75,32 @@ jobs:
             FE_NEW_COLOR=green; FE_NEW_PORT=${FE_GREEN_PORT}; FE_OLD_COLOR=blue
           fi
 
+          echo "BE -> ${BE_NEW_COLOR}:${BE_NEW_PORT}, FE -> ${FE_NEW_COLOR}:${FE_NEW_PORT}"
+
+          # Remove stale containers
           docker rm -f ${BE_PREFIX}-${BE_NEW_COLOR} || true
           docker rm -f ${FE_PREFIX}-${FE_NEW_COLOR} || true
 
+          # Run new containers
           docker run -d --name ${BE_PREFIX}-${BE_NEW_COLOR} -p ${BE_NEW_PORT}:8080 \
-            -e SPRING_PROFILES_ACTIVE=prod \
-            -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
-            -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
-            -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
-            ${BE_IMAGE}:${GITHUB_SHA}
+            -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
+            -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
+            ${BE_IMAGE}:${IMAGE_TAG}
 
           docker run -d --name ${FE_PREFIX}-${FE_NEW_COLOR} -p ${FE_NEW_PORT}:80 \
-            ${FE_IMAGE}:${GITHUB_SHA}
+            ${FE_IMAGE}:${IMAGE_TAG}
 
-          echo "Waiting for containers..."
+          echo "⏳ Waiting for warm-up..."
           sleep ${INITIAL_SLEEP}
 
-          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${BE_NEW_PORT}${HEALTH_PATH} || echo "000")
+          code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${BE_NEW_PORT}${HEALTH_PATH}" || echo "000")
           if [ "$code" != "200" ]; then
             echo "❌ Backend health check failed"
             docker logs ${BE_PREFIX}-${BE_NEW_COLOR} || true
             exit 1
           fi
 
+          echo "✅ Backend healthy, updating NGINX config"
           sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<EOL
             server {
                 listen 80;
@@ -106,4 +115,10 @@ jobs:
                 }
             }
             EOL
-                    sudo nginx -s reload
+                    sudo nginx -t && sudo systemctl reload nginx
+
+                    echo "🧹 Remove old containers"
+                    docker rm -f ${BE_PREFIX}-${BE_OLD_COLOR} || true
+                    docker rm -f ${FE_PREFIX}-${FE_OLD_COLOR} || true
+
+                    echo "🎉 Deployment complete"
