@@ -3,7 +3,7 @@ import './App.css';
 import axios from 'axios'; // axios 라이브러리 사용
 
 function App() {
-  // test 
+  // test build
   const [message, setMessage] = useState('Loading...');
 
   useEffect(() => {
