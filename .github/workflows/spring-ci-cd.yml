@@ -38,23 +38,19 @@ jobs:
 
     - name: Deploy with Blue/Green Strategy
       env:
-        # Application Environment
         SPRING_PROFILES_ACTIVE: prod
         SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
         SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
         SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
-        # JVM Options (Memory Optimization)
         JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
-        # Health Check Configuration
         HEALTH_PATH: "/actuator/health"
-        INITIAL_SLEEP: 25
-        RETRIES: 10
+        INITIAL_SLEEP: 45       # ⬅ 대기시간 증가
+        RETRIES: 15             # ⬅ 재시도 횟수 증가
         RETRY_INTERVAL: 5
         IMAGE_TAG: ${{ github.sha }}
       run: |
         echo "Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
 
-        # 1. Determine which color is active and which is inactive
         EXISTING_BLUE=$(docker ps -q -f name=${CONTAINER_PREFIX}-blue)
         if [ -z "$EXISTING_BLUE" ]; then
           NEW_COLOR="blue"
@@ -69,63 +65,49 @@ jobs:
         echo "Deploying new version to ${NEW_COLOR} on port ${NEW_PORT}"
         echo "Old version is ${OLD_COLOR}"
 
-        # 2. Stop and remove any stale container for the new color
-        docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+        docker rm -f ${CONTAINER_PREFIX}-${NEW_COLOR} || true
+        docker pull ${IMAGE_NAME}:${IMAGE_TAG}
 
-        # 3. Pull the specific image for this commit
-        docker pull ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
-
-        # 4. Run the new container
         docker run -d \
-          --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
+          --name ${CONTAINER_PREFIX}-${NEW_COLOR} \
           -p ${NEW_PORT}:8080 \
           -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
           -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
           -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
           -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
           -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
-          ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          ${IMAGE_NAME}:${IMAGE_TAG}
 
         echo "Waiting ${INITIAL_SLEEP}s for the container to warm up..."
         sleep ${INITIAL_SLEEP}
 
-        # 5. Health Check
         echo "Starting health check on http://localhost:${NEW_PORT}${HEALTH_PATH}"
         SUCCESS=0
         for i in $(seq 1 ${RETRIES}); do
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}" || echo "000")
           if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Health check passed on attempt $i."
+            echo "✅ Health check passed on attempt $i."
             SUCCESS=1
             break
           fi
-          echo "Health check attempt $i failed (HTTP code: $HTTP_CODE). Retrying in ${RETRY_INTERVAL}s..."
+          echo "⚠️ Health check attempt $i failed (HTTP code: $HTTP_CODE). Retrying in ${RETRY_INTERVAL}s..."
           sleep ${RETRY_INTERVAL}
         done
 
-        # 6. Handle Health Check Failure (Rollback)
         if [ "$SUCCESS" -ne 1 ]; then
-          echo "Health check failed after ${RETRIES} attempts."
+          echo "❌ Health check failed after ${RETRIES} attempts."
           echo "--- Last 200 lines of logs from failed container ---"
-          docker logs --tail 200 ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          docker logs --tail 200 ${CONTAINER_PREFIX}-${NEW_COLOR} || true
           echo "--- End of logs ---"
-          echo "Stopping and removing the failed container: ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR}"
-          docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          docker rm -f ${CONTAINER_PREFIX}-${NEW_COLOR} || true
           echo "Deployment failed. The old version (${OLD_COLOR}) is still active."
           exit 1
         fi
 
-        # 7. Switch Traffic (Placeholder)
-        echo "Health check successful. New version is healthy."
+        echo "✅ Health check successful. New version is healthy."
         echo "!!! ACTION REQUIRED: Implement traffic switching logic here. !!!"
-        echo "For example, update Nginx config to point to port ${NEW_PORT}, then reload."
-        # Example:
-        # sed -i "s/proxy_pass http:\/\/127.0.0.1:[0-9]\+;/proxy_pass http:\/\/127.0.0.1:${NEW_PORT};/" /etc/nginx/conf.d/app.conf
-        # systemctl reload nginx
-        # sleep 5 # Allow time for connections to drain from the old instance
 
-        # 8. Clean up the old container (after successful traffic switch)
         echo "Traffic switched to ${NEW_COLOR}. Cleaning up old container: ${CONTAINER_PREFIX}-${OLD_COLOR}"
-        docker rm -f ${{ env.CONTAINER_PREFIX }}-${OLD_COLOR} || true
+        docker rm -f ${CONTAINER_PREFIX}-${OLD_COLOR} || true
 
-        echo "Blue/Green Deployment successful."
+        echo "🎉 Blue/Green Deployment successful."
