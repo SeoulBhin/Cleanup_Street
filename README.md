@@ -10,3 +10,9 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 이도현 - 풀스택(API설계, API연동) github - di593488-sys
 
 남궁훈 - 프론트엔드(UI/UX) github - hoon2436
+
+- 0928 -
+서버
+백엔드 - 스프링
+프론트 - 리엑트
+CI/CD 구현, 무중단배포 테스트 중
