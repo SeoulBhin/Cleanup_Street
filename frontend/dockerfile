@@ -3,35 +3,30 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package.json and yarn.lock (or package-lock.json) for dependency caching
-# 💡 캐싱을 활용하여 빌드 속도를 높입니다.
+# [수정됨] yarn.lock 대신 package-lock.json을 복사합니다.
 COPY package.json ./
-COPY yarn.lock ./
+COPY package-lock.json ./
 
-# Install dependencies
-RUN yarn install --frozen-lockfile
+# [수정됨] yarn install 대신 npm ci를 사용하여 의존성을 설치합니다.
+# 'npm ci'는 package-lock.json을 사용하여 더 빠르고 일관된 설치를 보장합니다.
+RUN npm ci
 
 # Copy all source code
 COPY . .
 
-# Build the React application for production
-# 💡 'build' 폴더에 최종 빌드 결과물이 생성됩니다.
-RUN yarn build
+# [수정됨] yarn build 대신 npm run build를 사용하여 React 앱을 빌드합니다.
+RUN npm run build
 
 # Stage 2: Serve the React application with Nginx
 FROM nginx:alpine
 
-# Remove default Nginx configuration (선택 사항: 사용자 정의 설정으로 교체할 경우)
+# Remove default Nginx configuration
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy React build output to Nginx's public directory
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# (Optional) Copy custom Nginx configuration if you have one
-# 💡 Nginx를 통해 React 앱을 서빙하는 설정 파일이 필요하면 이곳에 복사합니다.
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 80 for Nginx (컨테이너 내부 Nginx 포트)
+# Expose port 80 for Nginx
 EXPOSE 80
 
 # Start Nginx
