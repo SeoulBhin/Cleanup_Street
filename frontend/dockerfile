@@ -3,18 +3,18 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# [수정됨] yarn.lock 대신 package-lock.json을 복사합니다.
+# [수정됨] package-lock.json 대신 package.json만 먼저 복사합니다.
+# 이렇게 하면 package.json이 변경되지 않았을 때 Docker가 캐시를 재사용하여 속도를 높입니다.
 COPY package.json ./
-COPY package-lock.json ./
 
-# [수정됨] yarn install 대신 npm ci를 사용하여 의존성을 설치합니다.
-# 'npm ci'는 package-lock.json을 사용하여 더 빠르고 일관된 설치를 보장합니다.
-RUN npm ci
+# [수정됨] 'npm ci' 대신 'npm install'을 사용하여 의존성을 설치합니다.
+# 'npm install'은 환경 차이에 대해 더 유연하게 작동합니다.
+RUN npm install
 
 # Copy all source code
 COPY . .
 
-# [수정됨] yarn build 대신 npm run build를 사용하여 React 앱을 빌드합니다.
+# React 애플리케이션을 빌드합니다.
 RUN npm run build
 
 # Stage 2: Serve the React application with Nginx
@@ -31,3 +31,4 @@ EXPOSE 80
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
+
