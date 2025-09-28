@@ -68,7 +68,7 @@ jobs:
 
         echo "Waiting for Spring app on port ${NEW_PORT} to be healthy..."
         sleep 15
-        for i in {1..20}; do # 헬스 체크 시도 횟수 복원
+        for i in {1..5}; do # [디버깅] 시도 횟수를 줄여서 빠르게 실패하도록 함
           RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${NEW_PORT}/api/hello)
           if [ "$RESPONSE_CODE" -eq 200 ]; then
             echo "Health check passed!"
@@ -89,9 +89,10 @@ jobs:
           sleep 5
         done
         
-        # [복원됨] 헬스 체크 실패 시, 컨테이너를 삭제하고 롤백합니다.
-        echo "Health check failed. Rolling back."
-        docker stop cleanup-street-spring-${NEW_COLOR}
-        docker rm cleanup-street-spring-${NEW_COLOR}
+        # [디버깅] 헬스 체크 실패 시, 컨테이너를 삭제하지 않고 로그를 출력합니다.
+        echo "Health check failed. Showing container logs for debugging."
+        echo "--- LOGS FOR cleanup-street-spring-${NEW_COLOR} ---"
+        docker logs cleanup-street-spring-${NEW_COLOR}
+        echo "--- END LOGS ---"
         exit 1
 
