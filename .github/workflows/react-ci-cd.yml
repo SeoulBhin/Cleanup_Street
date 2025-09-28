@@ -1,24 +1,27 @@
-# 워크플로우의 이름을 지정합니다. GitHub Actions 탭에 이 이름이 표시됩니다.
+# 워크플로우의 이름을 지정합니다.
 name: React Frontend CI/CD (Blue/Green)
 
-# 워크플로우가 언제 실행될지를 정의합니다.
+# 워크플로우 실행 조건을 정의합니다.
 on:
+  # 1. main 브랜치에 코드가 푸시될 때 자동으로 실행됩니다.
   push:
     branches:
       - main
+  # 2. GitHub Actions 탭에서 수동으로 실행할 수 있도록 합니다.
   workflow_dispatch:
 
-# 실행될 작업(job)들을 정의합니다.
+# 실행될 작업을 정의합니다.
 jobs:
   build-and-deploy:
+    # 이 작업이 EC2에 설치한 self-hosted 러너에서 실행되도록 지정합니다.
     runs-on: self-hosted
 
     steps:
-    # 1. 코드 체크아웃
+    # 1. 코드 체크아웃: GitHub 저장소의 코드를 러너(EC2)로 가져옵니다.
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 2. GHCR 로그인
+    # 2. GHCR 로그인: Docker 이미지를 푸시하기 위해 GitHub Container Registry에 로그인합니다.
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v2
       with:
@@ -26,19 +29,22 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_TOKEN }}
 
-    # 3. Docker Buildx 설정
+    # 3. Docker Buildx 설정: 고급 기능을 지원하는 Docker 빌드 엔진을 설정합니다.
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    # 4. Docker 이미지 빌드 및 푸시
+    # 4. Docker 이미지 빌드 및 푸시: React 앱을 Docker 이미지로 만들고 GHCR에 업로드합니다.
     - name: Build and push React Docker image
       uses: docker/build-push-action@v4
       with:
         context: ./frontend
         push: true
         tags: ghcr.io/seoulbhin/cleanup-street-react:latest
+        # GitHub 캐시 서비스가 불안정할 경우를 대비해 캐시 기능은 비활성화 상태로 둡니다.
+        # cache-from: type=gha
+        # cache-to: type=gha,mode=max
 
-    # 5. 블루/그린 전략으로 배포
+    # 5. 블루/그린 전략으로 배포: EC2 서버에서 무중단 배포 스크립트를 실행합니다.
     - name: Deploy with Blue/Green Strategy
       run: |
         echo "Starting React Frontend Blue/Green Deployment..."
@@ -65,7 +71,7 @@ jobs:
 
         echo "Waiting for React app on port ${NEW_PORT} to be healthy..."
         sleep 10
-        for i in {1..5}; do # [디버깅] 시도 횟수를 5번으로 줄여 빠르게 확인
+        for i in {1..20}; do
           if curl -s http://localhost:${NEW_PORT} > /dev/null; then
             echo "Health check passed!"
             echo "Switching Nginx traffic to port ${NEW_PORT}"
@@ -85,16 +91,9 @@ jobs:
           sleep 5
         done
         
-        # [디버깅] 헬스 체크 실패 시 컨테이너를 삭제하지 않고 로그를 출력하도록 수정
-        echo "Health check failed. Showing container logs for debugging."
-        echo "--- LOGS FOR cleanup-street-react-${NEW_COLOR} ---"
-        docker logs cleanup-street-react-${NEW_COLOR}
-        echo "--- END LOGS ---"
-        
-        # [디버깅] 컨테이너를 삭제하는 롤백 부분을 주석 처리하여 컨테이너를 남겨둡니다.
-        # echo "Rolling back."
-        # docker stop cleanup-street-react-${NEW_COLOR}
-        # docker rm cleanup-street-react-${NEW_COLOR}
-        
+        # 헬스 체크 실패 시 원래의 롤백 로직을 수행합니다.
+        echo "Health check failed. Rolling back."
+        docker stop cleanup-street-react-${NEW_COLOR}
+        docker rm cleanup-street-react-${NEW_COLOR}
         exit 1 # 배포 실패로 종료
 
