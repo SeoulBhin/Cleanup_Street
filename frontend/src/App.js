@@ -1,23 +1,23 @@
-import React, { useState } from "react";
 import axios from "axios";
+import { useState } from "react";
 
 function App() {
-  const [msg, setMsg] = useState("");
+  const [status, setStatus] = useState("Not checked");
 
   const checkBackend = async () => {
     try {
       const res = await axios.get("/api/hello");
-      setMsg(res.data);
+      setStatus("✅ Backend OK: " + res.data);
     } catch (err) {
-      setMsg("❌ 백엔드 연결 실패!");
+      setStatus("❌ Backend failed");
     }
   };
 
   return (
-    <div style={{ textAlign: "center", marginTop: "50px" }}>
-      <h1>Cleanup Street 테스트</h1>
-      <button onClick={checkBackend}>API 연결 테스트</button>
-      <p>{msg}</p>
+    <div>
+      <h1>Cleanup Street</h1>
+      <button onClick={checkBackend}>Check Backend</button>
+      <p>{status}</p>
     </div>
   );
 }
