@@ -37,9 +37,6 @@ jobs:
         context: ./backend
         push: true
         tags: ghcr.io/seoulbhin/cleanup-street-spring:latest
-        # [임시 조치] GitHub 캐시 서비스 장애를 우회하기 위해 캐시 기능을 비활성화합니다.
-        # cache-from: type=gha
-        # cache-to: type=gha,mode=max
 
     # 5. 블루/그린 전략으로 배포
     - name: Deploy with Blue/Green Strategy
@@ -60,8 +57,7 @@ jobs:
 
         echo "Deploying new Spring app to ${NEW_COLOR} on EC2 host port ${NEW_PORT}"
         
-        # [수정됨] 새 컨테이너를 실행하기 전에, 이름 충돌을 방지하기 위해
-        # 같은 이름의 기존 컨테이너가 있다면 강제로 삭제합니다.
+        # 이름 충돌 방지를 위해 기존 컨테이너가 있다면 먼저 삭제합니다.
         docker rm -f cleanup-street-spring-${NEW_COLOR} || true
         
         docker pull ghcr.io/seoulbhin/cleanup-street-spring:latest
@@ -72,7 +68,7 @@ jobs:
 
         echo "Waiting for Spring app on port ${NEW_PORT} to be healthy..."
         sleep 15
-        for i in {1..5}; do # [디버깅] 시도 횟수를 줄여서 빠르게 실패하도록 함
+        for i in {1..20}; do # 헬스 체크 시도 횟수 복원
           RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${NEW_PORT}/api/hello)
           if [ "$RESPONSE_CODE" -eq 200 ]; then
             echo "Health check passed!"
@@ -93,10 +89,9 @@ jobs:
           sleep 5
         done
         
-        # [디버깅] 헬스 체크 실패 시, 컨테이너를 삭제하지 않고 로그를 출력합니다.
-        echo "Health check failed. Showing container logs for debugging."
-        echo "--- LOGS FOR cleanup-street-spring-${NEW_COLOR} ---"
-        docker logs cleanup-street-spring-${NEW_COLOR}
-        echo "--- END LOGS ---"
+        # [복원됨] 헬스 체크 실패 시, 컨테이너를 삭제하고 롤백합니다.
+        echo "Health check failed. Rolling back."
+        docker stop cleanup-street-spring-${NEW_COLOR}
+        docker rm cleanup-street-spring-${NEW_COLOR}
         exit 1
 
