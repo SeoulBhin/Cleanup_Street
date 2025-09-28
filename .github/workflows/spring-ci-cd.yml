@@ -1,0 +1,97 @@
+name: Spring Backend CI/CD (Blue/Green)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # ... (Docker Buildx, GHCR Login 단계는 이전과 동일) ...
+
+    - name: Build and push Spring Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend # Dockerfile이 있는 backend 폴더 지정
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/your-spring-app:latest # GHCR에 푸시될 이미지 이름:태그
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Deploy with Blue/Green Strategy
+      run: |
+        echo "Starting Spring Backend Blue/Green Deployment..."
+
+        # 1. 현재 어떤 컨테이너가 서비스 중인지 확인 (Blue 또는 Green)
+        EXISTING_BLUE=$(docker ps -q -f name=spring-app-blue)
+        
+        # 2. 다음으로 배포할 컨테이너의 색상(Blue/Green) 및 포트 결정
+        NEW_COLOR=""
+        OLD_COLOR=""
+        NEW_PORT="" # 새로운 컨테이너가 EC2 호스트에 매핑될 포트
+        
+        if [ -z "$EXISTING_BLUE" ]; then
+          # 현재 blue가 없으면 (즉, green이 서비스 중이거나 첫 배포), 다음은 blue에 배포
+          NEW_COLOR="blue"
+          OLD_COLOR="green"
+          NEW_PORT=9090 # EC2 호스트의 9090번 포트에 매핑
+        else
+          # 현재 blue가 서비스 중이면, 다음은 green에 배포
+          NEW_COLOR="green"
+          OLD_COLOR="blue"
+          NEW_PORT=9091 # EC2 호스트의 9091번 포트에 매핑
+        fi
+
+        echo "Deploying new Spring app to ${NEW_COLOR} environment on EC2 host port ${NEW_PORT}"
+        
+        # 3. 새 버전의 Docker 이미지 풀(Pull) 및 컨테이너 실행
+        docker pull ghcr.io/${{ github.repository_owner }}/your-spring-app:latest
+        docker run -d \
+                   --name spring-app-${NEW_COLOR} \
+                   -p ${NEW_PORT}:8080 \
+                   ghcr.io/${{ github.repository_owner }}/your-spring-app:latest
+
+        # 4. 헬스 체크: 새 컨테이너가 정상적으로 시작될 때까지 대기
+        echo "Waiting for Spring app on port ${NEW_PORT} to be healthy..."
+        sleep 15 # Spring Boot 애플리케이션 시작 시간 고려
+        for i in {1..20}; do # 최대 20번 (100초) 시도
+          # Spring Actuator의 health 엔드포인트를 사용하여 헬스 체크
+          # `curl -s -o /dev/null -w "%{http_code}"` : 응답 본문 없이 HTTP 상태 코드만 가져옴
+          RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${NEW_PORT}/actuator/health)
+          if [ "$RESPONSE_CODE" -eq 200 ]; then
+            echo "Spring app health check passed on port ${NEW_PORT} (HTTP 200)!"
+
+            # 5. 트래픽 전환: Nginx 설정 파일을 변경하고 Nginx 리로드
+            echo "Switching Nginx traffic to Spring app on EC2 host port ${NEW_PORT}"
+            # `upstream spring_servers` 정의를 새 컨테이너의 포트로 변경
+            echo "upstream spring_servers { server 127.0.0.1:${NEW_PORT}; }" | sudo tee /etc/nginx/conf.d/spring-upstream.conf
+            # Nginx 설정 변경 후 리로드. `sudo` 권한은 사전 설정 필수.
+            sudo systemctl reload nginx
+
+            # 6. 이전 버전 컨테이너 중지 및 삭제 (무중단 전환 후)
+            OLD_CONTAINER=$(docker ps -q -f name=spring-app-${OLD_COLOR})
+            if [ -n "$OLD_CONTAINER" ]; then
+              echo "Stopping and removing old Spring app container: spring-app-${OLD_COLOR}"
+              docker stop spring-app-${OLD_COLOR}
+              docker rm spring-app-${OLD_COLOR}
+            fi
+            echo "Spring Backend Deployment successful!"
+            exit 0
+          fi
+          echo "Spring app health check attempt $i failed (HTTP Code: $RESPONSE_CODE). Retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        # 헬스 체크 실패 시 롤백 (새로 띄운 컨테이너 삭제)
+        echo "Spring app health check failed after multiple attempts. Rolling back deployment."
+        docker stop spring-app-${NEW_COLOR}
+        docker rm spring-app-${NEW_COLOR}
+        exit 1
