@@ -1,22 +1,13 @@
 # Stage 1: Build
-FROM gradle:jdk17-alpine AS builder
+FROM public.ecr.aws/docker/library/gradle:8.10.2-jdk17-alpine AS builder
 WORKDIR /app
-
-# Gradle Wrapper 파일들 복사
-COPY gradlew .
-COPY gradle gradle
-
-# build.gradle & settings.gradle 복사
 COPY build.gradle settings.gradle ./
-
-# 소스 복사
+COPY gradle gradle
 COPY src ./src
-
-# Gradle Wrapper 실행 (캐시 문제 방지 위해 --no-daemon)
-RUN chmod +x ./gradlew && ./gradlew bootJar --no-daemon --stacktrace
+RUN gradle bootJar --no-daemon
 
 # Stage 2: Run
-FROM openjdk:17-jdk-slim-buster
+FROM public.ecr.aws/docker/library/openjdk:17-jdk-slim
 WORKDIR /app
 COPY --from=builder /app/build/libs/*.jar app.jar
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
