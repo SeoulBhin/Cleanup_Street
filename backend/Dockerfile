@@ -7,7 +7,12 @@ COPY build.gradle settings.gradle ./
 COPY src ./src
 
 # Gradle을 사용하여 실행 가능한 JAR 파일을 빌드
-RUN gradle bootJar
+RUN ./gradlew bootJar
+
+# 캐시 활용, 테스트 제외 가능
+COPY gradlew .
+COPY gradle ./gradle
+RUN ./gradlew --no-daemon build -x test
 
 #  최적화된 OpenJDK 런타임 이미지를 사용
 FROM openjdk:17-jdk-slim-buster
