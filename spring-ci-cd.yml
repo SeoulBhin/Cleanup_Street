@@ -1,0 +1,118 @@
+name: Spring Backend CI/CD (Blue/Green)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    env:
+      IMAGE_NAME: ghcr.io/seoulbhin/cleanup-street-spring
+      CONTAINER_PREFIX: cleanup-street-spring
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push Spring Docker image
+      id: build_and_push
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: |
+          ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.IMAGE_NAME }}:latest
+
+    - name: 🔧 Pre-Deployment Cleanup
+      run: |
+        echo "🧹 Cleaning up Docker resources..."
+        docker container prune -f
+        docker image prune -af
+        docker volume prune -f
+        docker network prune -f
+        echo "✅ Cleanup done"
+
+    - name: Deploy with Blue/Green Strategy
+      env:
+        SPRING_PROFILES_ACTIVE: prod
+        SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+        SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+        SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+        JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+        HEALTH_PATH: "/actuator/health"
+        INITIAL_SLEEP: 20
+        RETRIES: 10
+        RETRY_INTERVAL: 5
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
+
+        EXISTING_BLUE=$(docker ps -q -f name=${CONTAINER_PREFIX}-blue)
+        if [ -z "$EXISTING_BLUE" ]; then
+          NEW_COLOR="blue"
+          OLD_COLOR="green"
+          NEW_PORT=9090
+        else
+          NEW_COLOR="green"
+          OLD_COLOR="blue"
+          NEW_PORT=9091
+        fi
+
+        echo "Deploying new version to ${NEW_COLOR} on port ${NEW_PORT}"
+        docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+
+        docker pull ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+
+        docker run -d \
+          --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
+          -p ${NEW_PORT}:8080 \
+          -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
+          -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
+          -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
+          -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
+          -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
+          ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+
+        echo "⏳ Waiting ${INITIAL_SLEEP}s for the container to warm up..."
+        sleep ${INITIAL_SLEEP}
+
+        SUCCESS=0
+        for i in $(seq 1 ${RETRIES}); do
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEW_PORT}${HEALTH_PATH}")
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Health check passed on attempt $i."
+            SUCCESS=1
+            break
+          fi
+          echo "Health check attempt $i failed (HTTP code: $HTTP_CODE). Retrying in ${RETRY_INTERVAL}s..."
+          sleep ${RETRY_INTERVAL}
+        done
+
+        if [ "$SUCCESS" -ne 1 ]; then
+          echo "❌ Health check failed. Rolling back..."
+          docker logs --tail 200 ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          docker rm -f ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} || true
+          exit 1
+        fi
+
+        echo "✅ New container is healthy, switching Nginx..."
+        sudo sed -i "s|127.0.0.1:[0-9]\+|127.0.0.1:${NEW_PORT}|" /etc/nginx/conf.d/spring-upstream.conf
+        sudo nginx -t && sudo systemctl reload nginx
+
+        echo "🧹 Cleaning up old container: ${CONTAINER_PREFIX}-${OLD_COLOR}"
+        docker rm -f ${{ env.CONTAINER_PREFIX }}-${OLD_COLOR} || true
+
+        echo "🎉 Deployment complete and Nginx switched to ${NEW_COLOR} (port ${NEW_PORT})"

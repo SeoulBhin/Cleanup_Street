@@ -1,0 +1,23 @@
+# 베이스 이미지 (작고 빠른 python slim 사용)
+FROM python:3.11-slim
+
+# 기본 패키지 설치 (영상 처리용 라이브러리)
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 libsm6 libxext6 libxrender-dev ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# 작업 디렉토리
+WORKDIR /app
+
+# requirements 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 소스 복사
+COPY app/ ./app
+
+# 기본 실행 경로
+WORKDIR /app
+
+# 기본 실행 (사용시 덮어쓰기 가능)
+CMD ["python", "anonymizer.py"]
