@@ -34,9 +34,9 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 - 기능구현 사람 얼굴, 차량 번호판 인식 및 블러 처리
 처리 전
 <p>
-  <img width = "75" alt="이미지" src = "https://github.com/user-attachments/assets/5e302a33-d8f8-4710-b788-f001403d2f8e">
+  <img width = "100" alt="이미지" src = "https://github.com/user-attachments/assets/5e302a33-d8f8-4710-b788-f001403d2f8e">
 </p>
 처리 
 <p>
-  <img width = "75" alt="이미지" src = "https://github.com/user-attachments/assets/26bd868a-bd8b-464f-b5b8-2be0bce92365">
+  <img width = "100" alt="이미지" src = "https://github.com/user-attachments/assets/26bd868a-bd8b-464f-b5b8-2be0bce92365">
 </p>
