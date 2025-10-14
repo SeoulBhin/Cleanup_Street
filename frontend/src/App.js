@@ -447,7 +447,7 @@ const GlobalStyles = () => (
 // ===================================================================================
 
 const initialAnnouncements = [
-  { id: 1, title: '[필독] 와챠웃! 커뮤니티 이용 규칙 안내', author: '관리자', date: '2025-10-15' },
+  { id: 1, title: '[필독] 와챠우! 커뮤니티 이용 규칙 안내', author: '관리자', date: '2025-10-15' },
   { id: 2, title: '개인정보 처리 방침 개정 안내', author: '관리자', date: '2025-10-10' },
   { id: 3, title: '서버 점검 예정 (오전 2시 ~ 4시)', author: '관리자', date: '2025-10-05' },
 ];
@@ -477,7 +477,7 @@ const Header = ({ setCurrentPage }) => (
       style={{ fontFamily: "'Anton', sans-serif" }}
       onClick={() => setCurrentPage('home')}
     >
-      와챠웃! (Watch out!)
+      와챠우우! (Watch out!)
     </h1>
     <div className="login-section">
       <input type="text" placeholder="아이디" />
@@ -533,10 +533,10 @@ const HomePage = () => (
 const IntroPage = () => (
   <div className="page-container intro-page fade-in">
     <h2 className="page-title">
-      '와챠웃!'에 오신 것을 환영합니다!
+      '와챠우!'에 오신 것을 환영합니다!
     </h2>
     <p>
-      '와챠웃!'은 우리 동네의 안전과 청결을 주민 스스로 지켜나가는 온라인 커뮤니티입니다. 
+      '와챠우!'는 우리 동네의 안전과 청결을 주민 스스로 지켜나가는 온라인 커뮤니티입니다. 
       일상 속에서 발견하는 작지만 중요한 문제들을 함께 공유하고 해결의 목소리를 내기 위해 만들어졌습니다.
     </p>
     <p>
@@ -544,7 +544,7 @@ const IntroPage = () => (
       주민 여러분의 작은 관심 하나하나가 모여 우리 동네를 더 안전하고, 더 깨끗하고, 더 살기 좋은 곳으로 만듭니다.
     </p>
     <p className="highlight">
-      여러분의 적극적인 참여가 변화의 시작입니다. 지금 바로 '와챠웃!'과 함께 우리 동네를 바꿔나가요!
+      여러분의 적극적인 참여가 변화의 시작입니다. 지금 바로 '와챠우!'와 함께 우리 동네를 바꿔나가요!
     </p>
   </div>
 );
