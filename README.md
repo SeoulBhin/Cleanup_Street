@@ -11,7 +11,7 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 
 남궁훈 - 프론트엔드(UI/UX) github - hoon2436
 
-이민형 - 백엔드(API, 기능)
+이민형 - 백엔드(API, 기능) - 1oforever
 
 <h2>0928</h2>
 
