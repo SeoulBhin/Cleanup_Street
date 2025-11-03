@@ -477,7 +477,7 @@ const Header = ({ setCurrentPage }) => (
       style={{ fontFamily: "'Anton', sans-serif" }}
       onClick={() => setCurrentPage('home')}
     >
-      와챠우우! (Watch out!)
+      와챠우! (Watch out!)
     </h1>
     <div className="login-section">
       <input type="text" placeholder="아이디" />
