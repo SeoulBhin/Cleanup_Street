@@ -13,6 +13,10 @@ app.get('/api/health', (req, res) => {
   res.status(200).send('API OK');
 });
 
+app.get('/api/hello', (req, res) => {
+  res.status(200).json({ message: 'cleanup street backend alive' });
+});
+
 const postRoutes = require('./routes/posts');
 
 const imagePreviewRoutes = require('./routes/image-previews');
