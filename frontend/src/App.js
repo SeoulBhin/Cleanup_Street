@@ -1,5 +1,6 @@
 // React 및 필요한 훅(hook)들을 가져옵니다.
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { apiFetch } from './lib/api';
 
 // ===================================================================================
 // CSS Styles: 별도 파일 대신 컴포넌트 내에 스타일을 직접 정의합니다.
@@ -207,11 +208,16 @@ const GlobalStyles = () => (
       gap: 1rem; /* space-y-4 */
     }
     .list-item {
-      padding: 1rem;
+      padding: 0.75rem 1rem;
       border: 1px solid #e5e7eb; /* border */
       border-radius: 0.5rem; /* rounded-lg */
       cursor: pointer;
       transition: box-shadow 0.2s;
+      background-color: #fff;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 140px;
+      gap: 0.75rem;
+      align-items: stretch;
     }
     .list-item:hover {
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); /* hover:shadow-md */
@@ -280,6 +286,24 @@ const GlobalStyles = () => (
     .post-meta {
       font-size: 0.875rem; /* text-sm */
       color: #9ca3af; /* text-gray-400 */
+    }
+    .post-thumbnail {
+      border-radius: 0.35rem;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      background-color: #fff;
+      width: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .post-thumbnail img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    .post-text {
+      min-width: 0;
     }
 
     /* New Post & Signup Page Forms */
@@ -538,6 +562,33 @@ const initialPosts = [
   { id: 3, category: '쓰레기 문제', title: '분리수거장에 무단 투기가 너무 많습니다.', author: '주민C', date: '2025-10-12', content: '음식물 쓰레기와 일반 쓰레기를 마구 버려서 냄새가 심합니다. CCTV 설치가 필요해 보입니다.' },
 ];
 
+const filterValidImages = (images) => {
+  if (!Array.isArray(images)) return [];
+  return images.filter((image) => typeof image.imageUrl === 'string' && image.imageUrl.startsWith('data:image'));
+};
+
+const normalizePost = (post = {}) => {
+  const userId = post.userId ?? post.user_id ?? null;
+  const createdAt = post.createdAt ?? post.created_at ?? null;
+
+  return {
+    id: post.id ?? post.post_id ?? post.postId ?? null,
+    userId,
+    title: post.title ?? '',
+    content: post.content ?? post.postBody ?? '',
+    category: post.category ?? '미분류',
+    status: post.status ?? null,
+    author: post.author ?? (userId ? `사용자 #${userId}` : '알 수 없음'),
+    createdAt,
+    date: post.date ?? (createdAt ? new Date(createdAt).toLocaleDateString() : undefined),
+    latitude: post.latitude ?? null,
+    longitude: post.longitude ?? null,
+    h3Index: post.h3_index ?? post.h3Index ?? null,
+    commentCount: post.comment_count ?? post.commentCount ?? 0,
+    images: filterValidImages(post.images),
+  };
+};
+
 const initialGalleryImages = [
   { id: 1, url: 'https://placehold.co/600x400/f87171/ffffff?text=Broken+Streetlight', caption: '고장난 가로등 신고' },
   { id: 2, url: 'https://placehold.co/600x400/60a5fa/ffffff?text=Pothole+Report', caption: '도로 파손 현장' },
@@ -646,7 +697,7 @@ const AnnouncementsPage = ({ announcements }) => (
   </div>
 );
 
-const ForumPage = ({ posts, setCurrentPage }) => (
+const ForumPage = ({ posts, setCurrentPage, isLoading, error, onRetry, onSelectPost }) => (
   <div className="page-container fade-in">
     <div className="forum-header">
       <h2 className="page-title">일반 게시판</h2>
@@ -657,30 +708,70 @@ const ForumPage = ({ posts, setCurrentPage }) => (
         글쓰기
       </button>
     </div>
-    <div className="list-container">
-      {posts.map((post) => {
-        const category = post.category || '미분류';
-        const title = post.title || '제목 없음';
-        const content = post.content || '';
-        const author = post.author || (post.userId ? `사용자 #${post.userId}` : '알 수 없음');
-        const createdAt = post.date || (post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-');
-        const statusText = post.status ? `상태: ${post.status}` : null;
 
-        return (
-          <div key={post.id ?? `${title}-${author}`} className="list-item forum-post">
-            <div className="post-header">
-              <span className="post-category">{category}</span>
-              <h3 className="list-item-title">{title}</h3>
+    {error && (
+      <div className="list-error">
+        <span>{error}</span>
+        {onRetry && (
+          <button type="button" onClick={onRetry}>
+            다시 시도
+          </button>
+        )}
+      </div>
+    )}
+
+    {isLoading && <p className="list-placeholder">게시글을 불러오는 중입니다...</p>}
+
+    {!isLoading && !error && posts.length === 0 && (
+      <p className="list-placeholder">등록된 게시글이 없습니다. 첫 글을 작성해보세요!</p>
+    )}
+
+    {posts.length > 0 && (
+      <div className="list-container">
+        {posts.map((post) => {
+          const category = post.category || '미분류';
+          const title = post.title || '제목 없음';
+          const content = post.content || '';
+          const author = post.author || (post.userId ? `사용자 #${post.userId}` : '알 수 없음');
+          const createdAt = post.date || (post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-');
+          const statusText = post.status ? `상태: ${post.status}` : null;
+          const previewImage = (post.images || [])[0];
+
+          return (
+            <div
+              key={post.id ?? `${title}-${author}`}
+              className="list-item forum-post"
+              onClick={() => onSelectPost?.(post.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectPost?.(post.id);
+                }
+              }}
+            >
+              <div className="post-text">
+                <div className="post-header">
+                  <span className="post-category">{category}</span>
+                  <h3 className="list-item-title">{title}</h3>
+                </div>
+                <p className="post-content">{content}</p>
+                <div className="post-meta">
+                  <span>작성자: {author}</span> | <span>작성일: {createdAt}</span>
+                  {statusText && <> | <span>{statusText}</span></>}
+                </div>
+              </div>
+              {previewImage?.imageUrl && (
+                <div className="post-thumbnail">
+                  <img src={previewImage.imageUrl} alt={`${title} 미리보기`} />
+                </div>
+              )}
             </div>
-            <p className="post-content">{content}</p>
-            <div className="post-meta">
-              <span>작성자: {author}</span> | <span>작성일: {createdAt}</span>
-              {statusText && <> | <span>{statusText}</span></>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    )}
   </div>
 );
 
@@ -746,7 +837,7 @@ const PostComposer = ({ userId, onPostCreated, setCurrentPage }) => {
     }
     setIsPreviewing(true);
     try {
-      const response = await fetch('/api/image-previews', {
+      const response = await apiFetch('/api/image-previews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -846,9 +937,10 @@ const PostComposer = ({ userId, onPostCreated, setCurrentPage }) => {
 
       if (previewId) {
         payload.previewId = previewId;
+        payload.selectedVariant = selectedVariant === 'plateVisible' ? 'PLATE_VISIBLE' : 'AUTO';
       }
 
-      const response = await fetch('/api/posts', {
+      const response = await apiFetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1012,6 +1104,57 @@ const PostComposer = ({ userId, onPostCreated, setCurrentPage }) => {
 };
 
 
+const PostDetailPage = ({ post, isLoading, error, onBack, onReload }) => (
+  <div className="page-container fade-in post-detail">
+    <div className="post-detail-actions">
+      <button type="button" className="form-btn btn-cancel" onClick={onBack}>
+        ← 목록으로
+      </button>
+      {onReload && (
+        <button type="button" className="form-btn btn-submit" onClick={onReload} disabled={isLoading}>
+          새로 고침
+        </button>
+      )}
+    </div>
+
+    {isLoading && <p className="list-placeholder">게시글을 불러오는 중입니다...</p>}
+
+    {error && (
+      <div className="list-error">
+        <span>{error}</span>
+        {onReload && (
+          <button type="button" onClick={onReload}>
+            다시 시도
+          </button>
+        )}
+      </div>
+    )}
+
+    {post && !isLoading && !error && (
+      <>
+        <h2 className="page-title">{post.title}</h2>
+        <div className="post-detail-meta">
+          <span>작성자: {post.author}</span>
+          <span>작성일: {post.date || (post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-')}</span>
+          {post.status && <span>상태: {post.status}</span>}
+        </div>
+
+        {post.images?.length > 0 && (
+          <div className="post-detail-gallery">
+            {post.images.map((image) => (
+              <figure key={image.imageId || image.variant} className="post-detail-image">
+                <img src={image.imageUrl} alt={`${image.variant || '이미지'} 미리보기`} />
+              </figure>
+            ))}
+          </div>
+        )}
+
+        <p className="post-detail-content">{post.content}</p>
+      </>
+    )}
+  </div>
+);
+
 const GalleryPage = ({ images }) => (
   <div className="page-container fade-in">
     <h2 className="page-title">활동 갤러리</h2>
@@ -1071,31 +1214,89 @@ const SignupPage = ({ setCurrentPage }) => {
 function App() {
   const [currentPage, setCurrentPage] = useState('home'); 
   const [announcements] = useState(initialAnnouncements);
-  const [posts, setPosts] = useState(initialPosts);
+  const [posts, setPosts] = useState(initialPosts.map(normalizePost));
   const [galleryImages] = useState(initialGalleryImages);
-  const [demoUserId, setDemoUserId] = useState(null);
+  const [demoUserId] = useState(DEFAULT_USER_ID);
+  const [isPostsLoading, setPostsLoading] = useState(false);
+  const [postsError, setPostsError] = useState('');
+  const [selectedPostId, setSelectedPostId] = useState(null);
+  const [postDetail, setPostDetail] = useState(null);
+  const [postDetailLoading, setPostDetailLoading] = useState(false);
+  const [postDetailError, setPostDetailError] = useState('');
 
-  const addPost = (post) => {
-    setPosts((prev) => [post, ...prev]);
-  };
+  const addPost = useCallback((post) => {
+    setPosts((prev) => [normalizePost(post), ...prev]);
+  }, []);
+
+  const loadPosts = useCallback(async () => {
+    setPostsLoading(true);
+    setPostsError('');
+    try {
+      const response = await apiFetch('/api/posts');
+      if (!response.ok) {
+        throw new Error('게시글을 불러오지 못했습니다.');
+      }
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        throw new Error('게시글 응답 형식이 올바르지 않습니다.');
+      }
+      setPosts(data.map(normalizePost));
+    } catch (error) {
+      console.error('Failed to load posts', error);
+      setPostsError(error.message || '게시글을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setPostsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch('/api/system/demo-user')
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('demo user lookup failed');
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (typeof data.userId === 'number') {
-          setDemoUserId(data.userId);
-        }
-      })
-      .catch((error) => {
-        console.warn('Failed to resolve demo user id, falling back to default', error);
-        setDemoUserId(DEFAULT_USER_ID);
-      });
+    loadPosts();
+  }, [loadPosts]);
+
+  useEffect(() => {
+    if (!selectedPostId) return;
+    const existing = posts.find((post) => post.id === selectedPostId);
+    if (existing) {
+      setPostDetail(existing);
+    }
+  }, [posts, selectedPostId]);
+
+  const loadPostDetail = useCallback(async (postId) => {
+    if (!postId) return;
+    setPostDetailLoading(true);
+    setPostDetailError('');
+    try {
+      const response = await apiFetch(`/api/posts/${postId}`);
+      if (!response.ok) {
+        throw new Error('게시글 정보를 불러오지 못했습니다.');
+      }
+      const data = await response.json();
+      setPostDetail(normalizePost(data));
+    } catch (error) {
+      console.error('Failed to load post detail', error);
+      setPostDetailError(error.message || '게시글 정보를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setPostDetailLoading(false);
+    }
+  }, []);
+
+  const handleSelectPost = useCallback((postId) => {
+    if (!postId) return;
+    setSelectedPostId(postId);
+    const existing = posts.find((post) => post.id === postId);
+    if (existing) {
+      setPostDetail(existing);
+    } else {
+      setPostDetail(null);
+    }
+    setCurrentPage('postDetail');
+    loadPostDetail(postId);
+  }, [posts, loadPostDetail]);
+
+  const handleBackToForum = useCallback(() => {
+    setCurrentPage('forum');
+    setSelectedPostId(null);
+    setPostDetailError('');
   }, []);
 
   const renderContent = () => {
@@ -1105,13 +1306,32 @@ function App() {
       case 'announcements':
         return <AnnouncementsPage announcements={announcements} />;
       case 'forum':
-        return <ForumPage posts={posts} setCurrentPage={setCurrentPage} />;
+        return (
+          <ForumPage
+            posts={posts}
+            setCurrentPage={setCurrentPage}
+            isLoading={isPostsLoading}
+            error={postsError}
+            onRetry={loadPosts}
+            onSelectPost={handleSelectPost}
+          />
+        );
       case 'newPost':
         return <PostComposer userId={demoUserId} onPostCreated={addPost} setCurrentPage={setCurrentPage} />;
       case 'gallery':
         return <GalleryPage images={galleryImages} />;
       case 'signup':
         return <SignupPage setCurrentPage={setCurrentPage} />;
+      case 'postDetail':
+        return (
+          <PostDetailPage
+            post={postDetail}
+            isLoading={postDetailLoading}
+            error={postDetailError}
+            onBack={handleBackToForum}
+            onReload={() => loadPostDetail(selectedPostId)}
+          />
+        );
       case 'home':
       default:
         return <HomePage />;

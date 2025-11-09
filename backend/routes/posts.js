@@ -2,24 +2,78 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+const BASE_SELECT = `
+  SELECT
+    p.post_id,
+    p.user_id,
+    p.title,
+    p.content,
+    p.category,
+    p.status,
+    p.comment_count,
+    p.h3_index,
+    p.latitude,
+    p.longitude,
+    p.created_at,
+    p.updated_at,
+    ST_AsText(p.location) AS location_wkt,
+    COALESCE(
+      (
+        SELECT json_agg(
+          json_build_object(
+            'imageId', pi.image_id,
+            'variant', pi.variant,
+            'imageUrl', pi.image_url,
+            'createdAt', pi.created_at
+          )
+          ORDER BY pi.image_id
+        )
+        FROM post_images pi
+        WHERE pi.post_id = p.post_id
+      ),
+      '[]'::json
+    ) AS images
+  FROM posts p
+`;
+
+const fetchPostById = async (postId) => {
+  const query = `${BASE_SELECT} WHERE p.post_id = $1`;
+  const { rows } = await db.query(query, [postId]);
+  return rows[0];
+};
+
+// GET posts list
+router.get('/', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+  try {
+    const query = `${BASE_SELECT} ORDER BY p.created_at DESC LIMIT $1 OFFSET $2`;
+    const { rows } = await db.query(query, [limit, offset]);
+    res.json(rows);
+  } catch (err) {
+    console.error('Failed to fetch posts:', err);
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+});
+
 // GET a single post by ID
 router.get('/:postId', async (req, res) => {
   const { postId } = req.params;
   try {
-    const { rows } = await db.query('SELECT * FROM posts WHERE id = $1', [postId]);
-    if (rows.length === 0) {
+    const post = await fetchPostById(postId);
+    if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
-    res.json(rows[0]);
+    res.json(post);
   } catch (err) {
-    console.error(err);
+    console.error('Failed to fetch post detail:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // CREATE a new post
 router.post('/', async (req, res) => {
-  // For testing, default userId to 1 if not provided
   const userId = req.body.userId || 1;
   const { title, postBody, category, latitude, longitude, h3Index, previewId } = req.body;
 
@@ -28,36 +82,57 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // In a real app, you would also handle the image processing and linking here,
-    // likely using the previewId to fetch the processed image data.
-    // For now, we'll just insert the post text data.
+    let previewData = null;
+    if (previewId) {
+      const previewResult = await db.query(
+        'SELECT auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1',
+        [previewId]
+      );
+      if (previewResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid previewId provided.' });
+      }
+      previewData = previewResult.rows[0];
+    }
 
     const location = (latitude && longitude) ? `SRID=4326;POINT(${longitude} ${latitude})` : null;
-
-    const query = `
+    const insertQuery = `
       INSERT INTO posts (user_id, title, content, category, location, h3_index, status, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-      RETURNING *;
+      RETURNING post_id;
     `;
-    
-    const values = [
+    const status = 'DONE';
+    const insertValues = [
       userId,
       title,
       postBody,
       category,
       location,
       h3Index,
-      previewId ? 'PROCESSING' : 'DONE' // Set status based on image presence
+      status
     ];
 
-    const { rows } = await db.query(query, values);
-    
-    // Here you would typically associate the images from the preview table with the new post
-    // and then mark the preview as 'used'.
+    const { rows } = await db.query(insertQuery, insertValues);
+    const newPostId = rows[0].post_id;
 
-    res.status(201).json(rows[0]);
+    if (previewData) {
+      const selectedVariant = req.body.selectedVariant === 'PLATE_VISIBLE' ? 'PLATE_VISIBLE' : 'AUTO';
+      const selectedImage =
+        selectedVariant === 'PLATE_VISIBLE'
+          ? previewData.plate_visible_image
+          : previewData.auto_mosaic_image;
+
+      const imageInsertQuery = `
+        INSERT INTO post_images (post_id, image_url, variant)
+        VALUES ($1, $2, $3);
+      `;
+      await db.query(imageInsertQuery, [newPostId, selectedImage, selectedVariant]);
+      await db.query('UPDATE image_previews SET is_used = true WHERE preview_id = $1', [previewId]);
+    }
+
+    const createdPost = await fetchPostById(newPostId);
+    res.status(201).json(createdPost);
   } catch (err) {
-    console.error(err);
+    console.error('Failed to create post', err);
     res.status(500).json({ error: 'Failed to create post' });
   }
 });

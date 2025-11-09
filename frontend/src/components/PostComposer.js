@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
+import { apiFetch } from "../lib/api";
 
 const initialFormState = {
   userId: "",
@@ -94,7 +95,7 @@ export default function PostComposer({ onSuccess, onCancel }) {
       formData.append("userId", form.userId);
       formData.append("image", file);
 
-      const response = await fetch("/api/images/upload", {
+      const response = await apiFetch("/api/images/upload", {
         method: "POST",
         body: formData,
       });
@@ -146,11 +147,13 @@ export default function PostComposer({ onSuccess, onCancel }) {
 
     setSubmitLoading(true);
     try {
-      const response = await fetch("/api/posts", {
+      const selectedVariantPayload = showPlateVisible ? "PLATE_VISIBLE" : "AUTO";
+      const response = await apiFetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           previewId,
+          selectedVariant: selectedVariantPayload,
           userId: Number(form.userId),
           title: form.title.trim(),
           postBody: form.postBody.trim(),
