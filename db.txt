@@ -1,12 +1,12 @@
 // 
 -- DB 연결 설정(서버 구성 완료)
 POSTgreSQL 16버전
-url = jdbc:postgresql://3.24.168.37:5433/cleanup
-host = 3.24.168.37
-port = 5433
-database = cleanup
-Username = user
-Password = 1234
+url = ""
+host = ""
+port = ""
+database = ""
+Username = ""
+Password = ""
 -- DB는 EC2서버에 이미 설치 완료 및 외부 접속 테스트 완료하였음 위 접속만 하면 됨
 
 -- 공통 enum
