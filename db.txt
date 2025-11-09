@@ -1,0 +1,127 @@
+// 
+-- DB 연결 설정(서버 구성 완료)
+POSTgreSQL 16버전
+url = jdbc:postgresql://3.24.168.37:5433/cleanup
+host = 3.24.168.37
+port = 5433
+database = cleanup
+Username = user
+Password = 1234
+-- DB는 EC2서버에 이미 설치 완료 및 외부 접속 테스트 완료하였음 위 접속만 하면 됨
+
+-- 공통 enum
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM ('USER','ADMIN');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE post_status AS ENUM ('PROCESSING','DONE');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 1. users (사용자 테이블)
+CREATE TABLE IF NOT EXISTS users (
+  user_id     BIGSERIAL PRIMARY KEY,
+  username    VARCHAR(50) UNIQUE NOT NULL,
+  email       CITEXT UNIQUE NOT NULL,
+  password    TEXT NOT NULL,          -- 해시 저장
+  role        user_role NOT NULL DEFAULT 'USER',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 2. posts (게시물 메인 테이블)
+CREATE TABLE IF NOT EXISTS posts (
+  post_id       BIGSERIAL PRIMARY KEY,
+  user_id       BIGINT NOT NULL,
+  title         VARCHAR(200) NOT NULL,
+  content       TEXT NOT NULL,
+  location      public.geography(Point, 4326),
+  category      VARCHAR(50),
+  status        post_status NOT NULL DEFAULT 'PROCESSING',
+  comment_count INT NOT NULL DEFAULT 0,
+  h3_index      BIGINT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  latitude      NUMERIC(9, 6),
+  longitude     NUMERIC(9, 6),
+  CONSTRAINT lat_range CHECK (latitude >= -90 AND latitude <= 90),
+  CONSTRAINT lng_range CHECK (longitude >= -180 AND longitude <= 180)
+);
+
+-- 3. comments (댓글 테이블)
+CREATE TABLE IF NOT EXISTS comments (
+  comment_id  BIGSERIAL PRIMARY KEY,
+  post_id     BIGINT NOT NULL,
+  user_id     BIGINT NOT NULL,
+  content     TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  -- (참고: FOREIGN KEY 제약은 원본 덤프에 있었으나, 이 형식에서는 생략)
+);
+
+-- 4. image_previews (이미지 미리보기/처리 테이블)
+CREATE TABLE IF NOT EXISTS image_previews (
+  preview_id          UUID PRIMARY KEY,
+  user_id             BIGINT NOT NULL,
+  original_image_url  TEXT NOT NULL,
+  auto_mosaic_image   TEXT NOT NULL,
+  plate_visible_image TEXT NOT NULL,
+  is_used             BOOLEAN NOT NULL DEFAULT false,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 5. post_images (게시물 이미지 테이블)
+CREATE TABLE IF NOT EXISTS post_images (
+  image_id    BIGSERIAL PRIMARY KEY,
+  post_id     BIGINT NOT NULL,
+  image_url   TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  variant     VARCHAR(40) NOT NULL DEFAULT 'ORIGINAL'
+);
+
+-- 6. post_reactions (게시물 반응/좋아요 테이블)
+CREATE TABLE IF NOT EXISTS post_reactions (
+  reaction_id   BIGSERIAL PRIMARY KEY,
+  post_id       BIGINT NOT NULL,
+  user_id       BIGINT NOT NULL,
+  reaction_type VARCHAR(20) NOT NULL DEFAULT 'like',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(post_id, user_id, reaction_type)
+);
+
+-- 7. alerts_master (알림 마스터 테이블)
+CREATE TABLE IF NOT EXISTS alerts_master (
+  alert_id    BIGSERIAL PRIMARY KEY,
+  message     TEXT NOT NULL,
+  target_type VARCHAR(20) NOT NULL,
+  target_id   BIGINT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 8. user_alerts (사용자별 알림 수신 테이블)
+CREATE TABLE IF NOT EXISTS user_alerts (
+  user_id      BIGINT NOT NULL,
+  alert_id     BIGINT NOT NULL,
+  is_read      BOOLEAN NOT NULL DEFAULT false,
+  delivered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY(user_id, alert_id)
+);
+
+-- 9. email_verifications (이메일 인증 테이블)
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id          BIGSERIAL PRIMARY KEY,
+  email       CITEXT NOT NULL,
+  code        VARCHAR(64) NOT NULL,
+  purpose     VARCHAR(40) NOT NULL,
+  verified    BOOLEAN NOT NULL DEFAULT false,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 10. reports (신고 테이블)
+CREATE TABLE IF NOT EXISTS reports (
+  report_id   BIGSERIAL PRIMARY KEY,
+  target_type VARCHAR(20) NOT NULL,
+  target_id   BIGINT NOT NULL,
+  user_id     BIGINT NOT NULL,
+  reason      TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

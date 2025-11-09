@@ -11,8 +11,11 @@ const runMosaicScript = (inputPath) => {
   return new Promise((resolve, reject) => {
     const pythonBinary = process.env.IMAGE_PROCESSING_PYTHON_BINARY || 'python';
     const scriptPath = path.join(__dirname, '..', 'scripts', 'mosaic', 'mosaic_processor.py');
-    const faceModelPath = path.join(__dirname, '..', '..', 'models', 'face', 'yolov8n-face.pt');
-    const plateModelPath = path.join(__dirname, '..', '..', 'models', 'plate', 'plate-detector.pt');
+    const faceModelPath = path.join(__dirname, '..', 'models', 'face', 'yolov8n-face.pt');
+    const plateModelPath = path.join(__dirname, '..', 'models', 'plate', 'plate-detector.pt');
+
+    console.log('DEBUG: faceModelPath =', faceModelPath);
+    console.log('DEBUG: plateModelPath =', plateModelPath);
 
     const args = [
       scriptPath,
@@ -40,13 +43,27 @@ const runMosaicScript = (inputPath) => {
         console.error(errorOutput);
         return reject(new Error('Image processing script failed.'));
       }
-      const results = output.trim().split('---SPLIT---');
-      if (results.length !== 2) {
+      const delimiter = '---SPLIT---';
+      const splitIndex = output.lastIndexOf(delimiter);
+      if (splitIndex === -1) {
+        console.error('[runMosaicScript] Missing delimiter in python output:', output);
         return reject(new Error('Unexpected output from python script.'));
       }
+
+      const autoSection = output.slice(0, splitIndex).trim();
+      const plateSection = output.slice(splitIndex + delimiter.length).trim();
+
+      const autoBase64 = autoSection.split('\n').pop()?.trim();
+      const plateBase64 = plateSection.split('\n').pop()?.trim();
+
+      if (!autoBase64 || !plateBase64) {
+        console.error('[runMosaicScript] Failed to parse base64 payloads:', output);
+        return reject(new Error('Unexpected output from python script.'));
+      }
+
       resolve({
-        autoMosaicImage: `data:image/jpeg;base64,${results[0]}`,
-        plateVisibleImage: `data:image/jpeg;base64,${results[1]}`,
+        autoMosaicImage: `data:image/jpeg;base64,${autoBase64}`,
+        plateVisibleImage: `data:image/jpeg;base64,${plateBase64}`,
       });
     });
   });
@@ -65,6 +82,7 @@ router.post('/', async (req, res) => {
 
   const tmpDir = path.join(__dirname, '..', 'tmp');
   const randomName = crypto.randomBytes(16).toString('hex');
+  const previewId = crypto.randomUUID();
   const tmpFilePath = path.join(tmpDir, `${randomName}.tmp`);
   let tempFileSaved = false;
 
@@ -79,18 +97,18 @@ router.post('/', async (req, res) => {
 
     // Save the preview to the database
     const query = `
-      INSERT INTO image_previews (user_id, original_image_url, auto_mosaic_image, plate_visible_image, created_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      RETURNING id, auto_mosaic_image, plate_visible_image;
+      INSERT INTO image_previews (preview_id, user_id, original_image_url, auto_mosaic_image, plate_visible_image, created_at)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      RETURNING preview_id, auto_mosaic_image, plate_visible_image;
     `;
     // Storing the full base64 URL in original_image_url might be too large.
     // Consider storing a reference or a smaller version if this becomes an issue.
-    const values = [userId, imageUrl, result.autoMosaicImage, result.plateVisibleImage];
+    const values = [previewId, userId, imageUrl, result.autoMosaicImage, result.plateVisibleImage];
     const { rows } = await db.query(query, values);
     const preview = rows[0];
 
     res.status(201).json({
-      previewId: preview.id,
+      previewId: preview.preview_id,
       autoMosaicImage: preview.auto_mosaic_image,
       plateVisibleImage: preview.plate_visible_image,
     });

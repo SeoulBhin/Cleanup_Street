@@ -1,5 +1,5 @@
 // React 및 필요한 훅(hook)들을 가져옵니다.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // ===================================================================================
 // CSS Styles: 별도 파일 대신 컴포넌트 내에 스타일을 직접 정의합니다.
@@ -404,6 +404,86 @@ const GlobalStyles = () => (
       opacity: 1;
     }
 
+    /* Mosaic preview blocks */
+    .mosaic-preview {
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      background-color: #f9fafb;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+    .mosaic-preview-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .mosaic-preview-title {
+      margin: 0;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .mosaic-preview-helper {
+      margin: 0.25rem 0 0;
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+    .mosaic-preview-image {
+      width: 100%;
+      max-height: 360px;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      background: linear-gradient(135deg, #f3f4f6, #ffffff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+      box-sizing: border-box;
+    }
+    .mosaic-preview-image img {
+      width: 100%;
+      height: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border-radius: 0.5rem;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+      display: block;
+    }
+    .mosaic-preview--original {
+      border-style: dashed;
+      background: #ffffff;
+    }
+    .mosaic-toggle-btn {
+      background: linear-gradient(to right, #ef4444, #dc2626);
+      color: white;
+      border: none;
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+      transition: opacity 0.2s ease;
+    }
+    .mosaic-toggle-btn:hover {
+      opacity: 0.9;
+    }
+    .mosaic-toggle-btn.active {
+      background: linear-gradient(to right, #2563eb, #1d4ed8);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+    .mosaic-toggle-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     /* Signup Page */
     .signup-form-container {
       max-width: 28rem; /* max-w-md */
@@ -570,7 +650,7 @@ const ForumPage = ({ posts, setCurrentPage }) => (
   <div className="page-container fade-in">
     <div className="forum-header">
       <h2 className="page-title">일반 게시판</h2>
-      <button 
+      <button
         onClick={() => setCurrentPage('newPost')}
         className="btn-write"
       >
@@ -578,46 +658,235 @@ const ForumPage = ({ posts, setCurrentPage }) => (
       </button>
     </div>
     <div className="list-container">
-      {posts.map(post => (
-        <div key={post.id} className="list-item forum-post">
-          <div className="post-header">
-            <span className="post-category">{post.category}</span>
-            <h3 className="list-item-title">{post.title}</h3>
+      {posts.map((post) => {
+        const category = post.category || '미분류';
+        const title = post.title || '제목 없음';
+        const content = post.content || '';
+        const author = post.author || (post.userId ? `사용자 #${post.userId}` : '알 수 없음');
+        const createdAt = post.date || (post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-');
+        const statusText = post.status ? `상태: ${post.status}` : null;
+
+        return (
+          <div key={post.id ?? `${title}-${author}`} className="list-item forum-post">
+            <div className="post-header">
+              <span className="post-category">{category}</span>
+              <h3 className="list-item-title">{title}</h3>
+            </div>
+            <p className="post-content">{content}</p>
+            <div className="post-meta">
+              <span>작성자: {author}</span> | <span>작성일: {createdAt}</span>
+              {statusText && <> | <span>{statusText}</span></>}
+            </div>
           </div>
-          <p className="post-content">{post.content}</p>
-          <div className="post-meta">
-            <span>작성자: {post.author}</span> | <span>작성일: {post.date}</span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 );
 
+const DEFAULT_USER_ID = 1;
 
-const NewPostPage = ({ addPost, setCurrentPage }) => {
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('가로등고장');
-  const [content, setContent] = useState('');
+const PostComposer = ({ userId, onPostCreated, setCurrentPage }) => {
+  const [form, setForm] = useState({
+    title: '',
+    content: '',
+    category: '가로등고장'
+  });
+  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [localPreviewUrl, setLocalPreviewUrl] = useState('');
+  const [previewId, setPreviewId] = useState(null);
+  const [maskedImages, setMaskedImages] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState('autoMasked');
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
+  const resolvedUserId = userId ?? DEFAULT_USER_ID;
+  const isUserReady = userId !== null && userId !== undefined;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) {
-      alert('제목과 내용을 모두 입력해주세요.');
-      return;
-    }
-    const newPost = {
-      id: Date.now(),
-      category,
-      title,
-      content,
-      author: '새로운주민', // 실제 앱에서는 로그인된 사용자 정보 사용
-      date: new Date().toISOString().split('T')[0]
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
     };
-    addPost(newPost);
-    setCurrentPage('forum');
+  }, [localPreviewUrl]);
+
+  const clearLocalPreview = () => {
+    setLocalPreviewUrl((previous) => {
+      if (previous) {
+        URL.revokeObjectURL(previous);
+      }
+      return '';
+    });
   };
 
+  if (!isUserReady) {
+    return (
+      <div className="page-container form-container fade-in">
+        <h2 className="page-title">새 글 작성</h2>
+        <p style={{ margin: 0 }}>테스트용 사용자를 불러오는 중입니다. 잠시만 기다려주세요.</p>
+      </div>
+    );
+  }
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const resetPreviewState = () => {
+    setPreviewId(null);
+    setMaskedImages(null);
+    setSelectedVariant('autoMasked');
+  };
+
+  const performPreview = async (dataUrl) => {
+    if (!dataUrl) {
+      return;
+    }
+    setIsPreviewing(true);
+    try {
+      const response = await fetch('/api/image-previews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: resolvedUserId,
+          imageUrl: dataUrl
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || '미리보기 생성에 실패했습니다.');
+      }
+      if (!data?.previewId) {
+        throw new Error('모자이크 응답이 올바르지 않습니다.');
+      }
+      setPreviewId(data.previewId);
+      setMaskedImages({
+        autoMasked: data.autoMosaicImage,
+        plateVisible: data.plateVisibleImage
+      });
+      setSelectedVariant('autoMasked');
+      clearLocalPreview();
+    } catch (error) {
+      console.error(error);
+      alert('모자이크 처리 중 오류가 발생했습니다.');
+      setImageDataUrl('');
+      clearLocalPreview();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      resetPreviewState();
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setImageDataUrl('');
+      clearLocalPreview();
+      resetPreviewState();
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드할 수 있습니다.');
+      event.target.value = '';
+      return;
+    }
+
+    clearLocalPreview();
+    setLocalPreviewUrl(URL.createObjectURL(file));
+    resetPreviewState();
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setImageDataUrl(reader.result);
+        void performPreview(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const togglePlateMask = () => {
+    setSelectedVariant((prev) => (prev === 'plateVisible' ? 'autoMasked' : 'plateVisible'));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!form.title.trim()) {
+      alert('제목을 입력해주세요.');
+      return;
+    }
+    if (!form.content.trim()) {
+      alert('내용을 입력해주세요.');
+      return;
+    }
+    if (imageDataUrl && (isPreviewing || !previewId)) {
+      alert('이미지 모자이크 처리가 끝날 때까지 잠시만 기다려주세요.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+        const payload = {
+          userId: resolvedUserId,
+          title: form.title.trim(),
+          postBody: form.content.trim(),
+          category: form.category
+        };
+
+      if (previewId) {
+        payload.previewId = previewId;
+      }
+
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const savedPost = await response.json();
+
+      if (!response.ok) {
+        throw new Error(savedPost?.message || '게시글 저장에 실패했습니다.');
+      }
+      onPostCreated(savedPost);
+      alert('게시글이 등록되었습니다.');
+      setCurrentPage('forum');
+      setForm({
+        title: '',
+        content: '',
+        category: '가로등고장'
+      });
+      setImageDataUrl('');
+      clearLocalPreview();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      resetPreviewState();
+    } catch (error) {
+      console.error(error);
+      alert('게시글을 저장하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const variantLabel =
+    selectedVariant === 'plateVisible' ? '번호판 모자이크 적용' : '번호판 모자이크 해제';
+  const displayedImage =
+    selectedVariant === 'plateVisible'
+      ? maskedImages?.plateVisible
+      : maskedImages?.autoMasked;
   return (
     <div className="page-container form-container fade-in">
       <h2 className="page-title">새 글 작성</h2>
@@ -627,8 +896,9 @@ const NewPostPage = ({ addPost, setCurrentPage }) => {
           <input
             type="text"
             id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            name="title"
+            value={form.title}
+            onChange={handleChange}
             className="form-input"
             required
           />
@@ -637,47 +907,103 @@ const NewPostPage = ({ addPost, setCurrentPage }) => {
           <label htmlFor="category">카테고리</label>
           <select
             id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            name="category"
+            value={form.category}
+            onChange={handleChange}
             className="form-select"
           >
-            <option>가로등고장</option>
-            <option>도로파손</option>
-            <option>쓰레기 문제</option>
-            <option>기타</option>
+            <option value="가로등고장">가로등고장</option>
+            <option value="도로파손">도로파손</option>
+            <option value="쓰레기 문제">쓰레기 문제</option>
+            <option value="기타">기타</option>
           </select>
-        </div>
-        <div className="form-group">
-          <label htmlFor="attachment">첨부파일</label>
-          <input
-            type="file"
-            id="attachment"
-            className="form-input"
-          />
         </div>
         <div className="form-group">
           <label htmlFor="content">내용</label>
           <textarea
             id="content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+            name="content"
+            value={form.content}
+            onChange={handleChange}
             className="form-textarea"
             required
           ></textarea>
         </div>
+        <div className="form-group">
+          <label htmlFor="attachment">이미지 첨부 (선택)</label>
+          <input
+            type="file"
+            id="attachment"
+            accept="image/*"
+            className="form-input"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+          />
+        </div>
+        {localPreviewUrl && (!maskedImages || isPreviewing) && (
+          <div className="form-group">
+            <label>원본 미리보기</label>
+            <div className="mosaic-preview mosaic-preview--original">
+              <div className="mosaic-preview-toolbar">
+                <div>
+                  <p className="mosaic-preview-title">모자이크 준비 중입니다.</p>
+                  <p className="mosaic-preview-helper">잠시 후 얼굴과 번호판이 자동으로 가려집니다.</p>
+                </div>
+              </div>
+              <div className="mosaic-preview-image">
+                <img src={localPreviewUrl} alt="원본 미리보기" />
+              </div>
+            </div>
+          </div>
+        )}
+        {isPreviewing && (
+          <p style={{ color: '#2563eb', margin: '0' }}>모자이크 처리 중입니다...</p>
+        )}
+        {maskedImages && displayedImage && (
+          <div className="form-group">
+            <label>모자이크 미리보기</label>
+            <div className="mosaic-preview">
+              <div className="mosaic-preview-toolbar">
+                <div>
+                  <p className="mosaic-preview-title">업로드한 사진은 자동으로 모자이크 처리됐어요.</p>
+                  <p className="mosaic-preview-helper">
+                    {selectedVariant === 'plateVisible'
+                      ? '필요한 경우에만 번호판을 가려주세요.'
+                      : '얼굴과 번호판이 모두 가려진 상태입니다.'}
+                  </p>
+                </div>
+                {maskedImages.plateVisible && (
+                  <button
+                    type="button"
+                    className={`mosaic-toggle-btn ${selectedVariant === 'plateVisible' ? 'active' : ''}`}
+                    onClick={togglePlateMask}
+                  >
+                    {variantLabel}
+                  </button>
+                )}
+              </div>
+              <div className="mosaic-preview-image">
+                <img src={displayedImage} alt="모자이크 미리보기" />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="form-actions">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => setCurrentPage('forum')}
             className="form-btn btn-cancel"
+            disabled={isSubmitting}
           >
             취소
           </button>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="form-btn btn-submit"
+            disabled={isSubmitting || isPreviewing}
           >
-            작성 완료
+            글작성 완료
           </button>
         </div>
       </form>
@@ -744,13 +1070,33 @@ const SignupPage = ({ setCurrentPage }) => {
 // ===================================================================================
 function App() {
   const [currentPage, setCurrentPage] = useState('home'); 
-  const [announcements, setAnnouncements] = useState(initialAnnouncements);
+  const [announcements] = useState(initialAnnouncements);
   const [posts, setPosts] = useState(initialPosts);
-  const [galleryImages, setGalleryImages] = useState(initialGalleryImages);
+  const [galleryImages] = useState(initialGalleryImages);
+  const [demoUserId, setDemoUserId] = useState(null);
 
   const addPost = (post) => {
-    setPosts([post, ...posts]);
+    setPosts((prev) => [post, ...prev]);
   };
+
+  useEffect(() => {
+    fetch('/api/system/demo-user')
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('demo user lookup failed');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (typeof data.userId === 'number') {
+          setDemoUserId(data.userId);
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to resolve demo user id, falling back to default', error);
+        setDemoUserId(DEFAULT_USER_ID);
+      });
+  }, []);
 
   const renderContent = () => {
     switch (currentPage) {
@@ -761,7 +1107,7 @@ function App() {
       case 'forum':
         return <ForumPage posts={posts} setCurrentPage={setCurrentPage} />;
       case 'newPost':
-        return <NewPostPage addPost={addPost} setCurrentPage={setCurrentPage} />;
+        return <PostComposer userId={demoUserId} onPostCreated={addPost} setCurrentPage={setCurrentPage} />;
       case 'gallery':
         return <GalleryPage images={galleryImages} />;
       case 'signup':
@@ -802,4 +1148,3 @@ function App() {
 }
 
 export default App;
-

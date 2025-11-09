@@ -5,8 +5,16 @@ services:
       dockerfile: Dockerfile
     ports:
       - "9090:8080"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      - PORT=8080
+      - DB_HOST=3.24.168.37
+      - DB_USER=user
+      - DB_PASSWORD=1234
+      - DB_DATABASE=cleanup
+      - DB_PORT=5433
 
   frontend:
     build:
@@ -16,3 +24,4 @@ services:
       - "3000:80"
     depends_on:
       - backend
+# docker-compose.yml 파일 중...
