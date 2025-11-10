@@ -42,3 +42,10 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 <p align = "center">
   <img width = "700" alt="이미지" src = "https://github.com/user-attachments/assets/26bd868a-bd8b-464f-b5b8-2be0bce92365">
 </p>
+
+<h2>1110</h2>
+김경빈<br>
+- 차량 번호판, 사람 얼굴 모자이크 기능 (선택시 차량 번호판 모자이크 해제) <br>
+- 일반 게시판 DB에서 글 읽어오기 <br>
+- 일반 게시판 글 보기  <br>
+- EC2 서버 PostgreSQL 설치(16) <br>
