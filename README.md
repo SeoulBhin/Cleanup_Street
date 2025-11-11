@@ -49,3 +49,4 @@ Github CD/CI 무중단 배포 서비스 Cleanup Street
 - 일반 게시판 DB에서 글 읽어오기 <br>
 - 일반 게시판 글 보기  <br>
 - EC2 서버 PostgreSQL 설치(16) <br>
+test
