@@ -124,18 +124,14 @@ class MosaicProcessor:
         return self._detect(self.plate_model, img)
 
     def apply_mosaic(self, img: np.ndarray, detections: Iterable[Detection], pixel_size: int = 20) -> np.ndarray:
-        """탐지된 영역에 모자이크를 적용합니다."""
+        """탐지된 영역을 흰색으로 덮어 정보를 가립니다."""
         output_img = img.copy()
         h, w, _ = output_img.shape
         for det in detections:
             x1, y1, x2, y2 = det.clip(w, h).box
-            roi = output_img[y1:y2, x1:x2]
-            if roi.size == 0:
+            if x2 <= x1 or y2 <= y1:
                 continue
-            roi_h, roi_w, _ = roi.shape
-            small = cv2.resize(roi, (roi_w // pixel_size, roi_h // pixel_size), interpolation=cv2.INTER_NEAREST)
-            mosaic = cv2.resize(small, (roi_w, roi_h), interpolation=cv2.INTER_NEAREST)
-            output_img[y1:y2, x1:x2] = mosaic
+            output_img[y1:y2, x1:x2] = 255  # 채워진 흰색 박스로 덮어냅니다.
         return output_img
 
     def to_base64(self, img: np.ndarray) -> str:
