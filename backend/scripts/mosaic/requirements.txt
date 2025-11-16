@@ -1,15 +1,15 @@
-# 1. PyTorch 라이브러리를 CPU 버전으로 다운로드하도록 서버 주소 '지정'
+# 1. PyTorch 라이브러리를 CPU 버전으로 다운로드하도록 서버 주소 지정
 --index-url https://download.pytorch.org/whl/cpu
 
-# 2. '그리고' 기본 PyPI 저장소도 '추가'로 사용
+# 2. 기본 PyPI 저장소도 추가로 사용
 --extra-index-url https://pypi.org/simple
 
-# 3. torch CPU 버전을 명시적으로 설치 (ultralytics가 필요로 함)
+# 3. torch CPU 버전을 설치
 torch
 torchvision
 torchaudio
 
-# 4. 나머지 기존 라이브러리
+# 4. 나머지 라이브러리
 ultralytics==8.2.103
 opencv-python==4.10.0.84
 Pillow==10.4.0

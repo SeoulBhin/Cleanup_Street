@@ -13,9 +13,9 @@ import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
-# --- 초기 설정 및 경로 탐색 ---
+# --- 초기 설정 및 경로 ---
 
-# 현재 스크립트의 디렉토리를 기준으로 경로를 설정합니다.
+# 스크립트의 디렉토리를 기준으로 경로를 설정
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
@@ -25,19 +25,19 @@ def _find_models_dir() -> Path:
         maybe = candidate / "models"
         if maybe.exists():
             return maybe
-    # 찾지 못한 경우, 스크립트 디렉토리 아래에 있다고 가정합니다.
+    # 찾지 못한 경우, 스크립트 디렉토리 아래에 있다고 가정 테스트 용
     return SCRIPT_DIR / "models"
 
 
-# 모델 파일이 저장된 기본 경로를 설정합니다.
+# 모델 파일이 저장된 기본 경로를 설정
 MODELS_DIR = _find_models_dir()
 DEFAULT_FACE_MODEL = MODELS_DIR / "face" / "yolov8n-face.pt"
 DEFAULT_PLATE_MODEL = MODELS_DIR / "plate" / "plate-detector.pt"
 
 
-# --- 데이터 클래스 정의 ---
+# --- 클래스 정의 ---
 
-@dataclass
+@dataclass 
 class Detection:
     """탐지된 객체 정보를 저장하는 데이터 클래스."""
     label: str  # 객체 레이블 (e.g., "face", "plate")
@@ -90,7 +90,7 @@ class MosaicProcessor:
         imgsz: int | Tuple[int, int] = 640,
     ) -> None:
         """
-        MosaicProcessor를 초기화합니다.
+        MosaicProcessor를 초기화
 
         Args:
             face_model (str | Path): 얼굴 탐지 모델 파일 경로.
@@ -116,31 +116,31 @@ class MosaicProcessor:
         return detections
 
     def detect_faces(self, img: np.ndarray) -> List[Detection]:
-        """이미지에서 얼굴을 탐지합니다."""
+        """이미지에서 얼굴을 탐지."""
         return self._detect(self.face_model, img)
 
     def detect_plates(self, img: np.ndarray) -> List[Detection]:
-        """이미지에서 번호판을 탐지합니다."""
+        """이미지에서 번호판을 탐지."""
         return self._detect(self.plate_model, img)
 
     def apply_mosaic(self, img: np.ndarray, detections: Iterable[Detection], pixel_size: int = 20) -> np.ndarray:
-        """탐지된 영역을 흰색으로 덮어 정보를 가립니다."""
+        """탐지된 영역을 흰색으로 덮어 정보를 모자이크."""
         output_img = img.copy()
         h, w, _ = output_img.shape
         for det in detections:
             x1, y1, x2, y2 = det.clip(w, h).box
             if x2 <= x1 or y2 <= y1:
                 continue
-            output_img[y1:y2, x1:x2] = 255  # 채워진 흰색 박스로 덮어냅니다.
+            output_img[y1:y2, x1:x2] = 255  # 채워진 흰색 박스로 rgb.
         return output_img
 
     def to_base64(self, img: np.ndarray) -> str:
-        """OpenCV 이미지를 Base64 문자열로 변환합니다."""
+        """OpenCV 이미지를 Base64 문자열로 변환"""
         _, buffer = cv2.imencode(".jpg", img)
         return base64.b64encode(buffer).decode("utf-8")
 
     def process_image_from_path(self, input_path: str | Path) -> ProcessedImage:
-        """지정된 경로의 이미지를 처리합니다."""
+        """지정된 경로의 이미지를 처리"""
         img = cv2.imread(str(input_path))
         if img is None:
             raise FileNotFoundError(f"이미지를 로드할 수 없습니다: {input_path}")
