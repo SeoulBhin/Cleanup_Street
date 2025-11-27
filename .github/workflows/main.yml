@@ -134,11 +134,11 @@ jobs:
                     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
                 }
             }
-            EOL
-                    sudo nginx -t && sudo systemctl reload nginx
+EOL
+          sudo nginx -t && sudo systemctl reload nginx
 
-                    echo "🧹 Remove old containers"
-                    docker rm -f ${BE_PREFIX}-${BE_OLD_COLOR} || true
-                    docker rm -f ${FE_PREFIX}-${FE_OLD_COLOR} || true
+          echo "🧹 Remove old containers"
+          docker rm -f ${BE_PREFIX}-${BE_OLD_COLOR} || true
+          docker rm -f ${FE_PREFIX}-${FE_OLD_COLOR} || true
 
-                    echo "🎉 Deployment complete"
+          echo "🎉 Deployment complete"

@@ -23,7 +23,8 @@ services:
       args:
         - REACT_APP_API_BASE_URL=http://52.63.57.185:9090
     ports:
-      - "3000:80"
+      # Serve frontend on port 80 so http://52.63.57.185/ loads the app.
+      - "80:80"
     depends_on:
       - backend
 # docker-compose.yml 파일 중...
