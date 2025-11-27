@@ -10,7 +10,7 @@ services:
       - /app/node_modules
     environment:
       - PORT=8080
-      - DB_HOST=3.24.168.37
+      - DB_HOST=52.63.57.185
       - DB_USER=user
       - DB_PASSWORD=1234
       - DB_DATABASE=cleanup
@@ -21,7 +21,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - REACT_APP_API_BASE_URL=http://localhost:9090
+        - REACT_APP_API_BASE_URL=http://52.63.57.185:9090
     ports:
       - "3000:80"
     depends_on:

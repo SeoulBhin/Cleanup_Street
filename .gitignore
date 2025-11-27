@@ -3,3 +3,5 @@ RSA.pem
 /package.json
 /package-lock.json
 /backend/scripts/mosaic/.venv/
+next.txt
+db
