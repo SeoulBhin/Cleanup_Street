@@ -173,7 +173,7 @@ def main():
     parser.add_argument("--face-model", type=Path, default=DEFAULT_FACE_MODEL, help="얼굴 탐지 모델 경로.")
     parser.add_argument("--plate-model", type=Path, default=DEFAULT_PLATE_MODEL, help="번호판 탐지 모델 경로.")
     parser.add_argument("--conf", type=float, default=0.3, help="탐지 최소 신뢰도.")
-    parser.add_argument("--imgsz", type=int, default=416, help="모델 입력 이미지 크기.")
+    parser.add_argument("--imgsz", type=int, default=640, help="모델 입력 이미지 크기.")
     parser.add_argument("--output-meta", type=Path, help="탐지 메타데이터를 저장할 JSON 파일 경로.")
     args = parser.parse_args()
 
