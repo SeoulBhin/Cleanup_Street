@@ -1,4 +1,4 @@
-name: Full CI/CD (Frontend + Backend, Blue/Green, Nginx Auto-Switch)
+name: Full CI/CD
 
 on:
   push:
