@@ -4,13 +4,21 @@
 # 2. 기본 PyPI 저장소도 추가로 사용
 --extra-index-url https://pypi.org/simple
 
-# 3. torch CPU 버전을 설치
+# 3. torch CPU 버전을 설치 (기존)
 torch
 torchvision
 torchaudio
 
-# 4. 나머지 라이브러리
+# 4. 나머지 라이브러리 (기존)
 ultralytics==8.2.103
 opencv-python==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
+
+# 5. 새로 추가 Kobert를 위한 라이브러리
+transformers
+datasets
+pandas
+fastapi
+uvicorn
+pydantic
