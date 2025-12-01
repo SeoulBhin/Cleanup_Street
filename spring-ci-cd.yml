@@ -11,6 +11,12 @@ jobs:
     env:
       IMAGE_NAME: ghcr.io/seoulbhin/cleanup-street-spring
       CONTAINER_PREFIX: cleanup-street-spring
+      # Optional overrides; defaults below in the deploy step keep prod pointing to the correct DB port (5433).
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_DATABASE: ${{ secrets.DB_DATABASE }}
 
     steps:
     - name: Checkout code
@@ -60,6 +66,13 @@ jobs:
       run: |
         echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
 
+        # DB env defaults (can be overridden via GitHub secrets above)
+        DB_HOST=${DB_HOST:-52.63.57.185}
+        DB_PORT=${DB_PORT:-5433}
+        DB_USER=${DB_USER:-user}
+        DB_PASSWORD=${DB_PASSWORD:-1234}
+        DB_DATABASE=${DB_DATABASE:-cleanup}
+
         EXISTING_BLUE=$(docker ps -q -f name=${CONTAINER_PREFIX}-blue)
         if [ -z "$EXISTING_BLUE" ]; then
           NEW_COLOR="blue"
@@ -83,6 +96,11 @@ jobs:
           -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
           -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
           -e SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD}" \
+          -e DB_HOST="${DB_HOST}" \
+          -e DB_PORT="${DB_PORT}" \
+          -e DB_USER="${DB_USER}" \
+          -e DB_PASSWORD="${DB_PASSWORD}" \
+          -e DB_DATABASE="${DB_DATABASE}" \
           -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
           ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
