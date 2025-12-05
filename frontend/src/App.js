@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import Layout from "./front/Layout";
+import Layout from "./front/layout";
 
 import HomePage from "./front/HomePage";
 import IntroPage from "./front/IntroPage";
