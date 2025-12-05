@@ -1,4 +1,3 @@
-
 // backend/server.js
 require("dotenv").config();
 
@@ -128,6 +127,36 @@ const SQL = {
   DELETE_BY_ID_GENERIC: `
     DELETE FROM posts
     WHERE post_id = $1
+  `,
+};
+
+// ========================= 채팅용 SQL (chat_* 스키마 기준) =========================
+
+const CHAT_SQL = {
+  INSERT_MESSAGE: `
+    INSERT INTO chat_messages (room_id, sender_id, content)
+    VALUES ($1, $2, $3)
+    RETURNING message_id, room_id, sender_id, content, created_at, is_deleted
+  `,
+  UPSERT_MEMBER: `
+    INSERT INTO chat_room_members (room_id, user_id)
+    VALUES ($1, $2)
+    ON CONFLICT (room_id, user_id) DO NOTHING
+  `,
+  LOAD_RECENT_MESSAGES: `
+    SELECT
+      message_id,
+      room_id,
+      sender_id,
+      content,
+      created_at,
+      is_deleted
+    FROM chat_messages
+    WHERE room_id = $1
+      AND is_deleted = false
+    ORDER BY created_at ASC
+    LIMIT $2
+    OFFSET $3
   `,
 };
 
@@ -373,15 +402,96 @@ app.get("/tiles/:z/:x/:y.png", async (req, res) => {
 // ========================= Socket.IO (채팅) =========================
 
 io.on("connection", (socket) => {
-  socket.on("room:join",  (roomId) => roomId && socket.join(roomId));
-  socket.on("room:leave", (roomId) => roomId && socket.leave(roomId));
-  socket.on("join",       ({ roomId }) => roomId && socket.join(roomId));
+  console.log("✅ socket connected:", socket.id);
 
-  const broadcast = ({ roomId, text, ts }) => {
-    if (!roomId || !text) return;
-    const payload = { text, ts: ts || Date.now(), from: socket.id };
-    socket.to(roomId).emit("msg", payload);
-    // 🔥 여기에서 DB에 채팅 저장하려면 INSERT 쿼리 추가하면 됨
+  // 방 참여 (프론트: s.emit("join", { roomId, userId }) 또는 { roomId }만 보내도 동작)
+  socket.on("join", async ({ roomId, userId }) => {
+    try {
+      if (!roomId) return;
+
+      const numericRoomId = Number(roomId);
+      if (Number.isNaN(numericRoomId)) {
+        console.warn("join: invalid roomId:", roomId);
+        return;
+      }
+
+      socket.join(String(roomId));
+
+      // userId가 있으면 방 멤버 테이블에 upsert
+      if (userId) {
+        try {
+          await db.query(CHAT_SQL.UPSERT_MEMBER, [numericRoomId, Number(userId)]);
+        } catch (err) {
+          console.error("UPSERT_MEMBER error:", err);
+        }
+      }
+
+      // (선택) 최근 메시지 불러오기 → 필요하면 주석 해제
+      // const { rows } = await db.query(CHAT_SQL.LOAD_RECENT_MESSAGES, [numericRoomId, 50, 0]);
+      // socket.emit("msg:init", rows.map((r) => ({
+      //   id: r.message_id,
+      //   roomId: r.room_id,
+      //   userId: r.sender_id,
+      //   text: r.content,
+      //   ts: r.created_at,
+      //   from: r.sender_id,
+      // })));
+    } catch (err) {
+      console.error("join handler error:", err);
+    }
+  });
+
+  // 기존 room:join / room:leave도 유지 (필요하면 프론트에서 사용)
+  socket.on("room:join", (roomId) => {
+    if (!roomId) return;
+    socket.join(String(roomId));
+  });
+
+  socket.on("room:leave", (roomId) => {
+    if (!roomId) return;
+    socket.leave(String(roomId));
+  });
+
+  // 메시지 브로드캐스트 + DB 저장
+  const broadcast = async ({ roomId, text, ts, userId }) => {
+    try {
+      if (!roomId || !text) return;
+
+      const numericRoomId = Number(roomId);
+      if (Number.isNaN(numericRoomId)) {
+        console.warn("broadcast: invalid roomId:", roomId);
+        return;
+      }
+
+      let saved = null;
+
+      // userId가 있으면 DB에 저장 (비로그인/익명은 저장 안 해도 됨)
+      if (userId) {
+        try {
+          const { rows } = await db.query(CHAT_SQL.INSERT_MESSAGE, [
+            numericRoomId,
+            Number(userId),
+            text,
+          ]);
+          saved = rows[0];
+        } catch (err) {
+          console.error("INSERT_MESSAGE error:", err);
+        }
+      }
+
+      const payload = {
+        roomId: numericRoomId,
+        text,
+        ts: saved ? saved.created_at : (ts || Date.now()),
+        userId,
+        from: userId || socket.id,
+      };
+
+      // 같은 방의 다른 클라이언트에게만 전송 (본인은 프론트에서 logs에 push)
+      socket.to(String(roomId)).emit("msg", payload);
+    } catch (err) {
+      console.error("broadcast error:", err);
+    }
   };
 
   socket.on("msg",       broadcast);
