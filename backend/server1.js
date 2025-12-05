@@ -1,4 +1,4 @@
-/*
+
 // backend/server.js
 require("dotenv").config();
 
@@ -25,6 +25,7 @@ const ALLOW_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  //"http://watchout.com", // 배포 후 도메인 여기에 추가
 ];
 
 // React 빌드 폴더 (frontend/build)
@@ -132,21 +133,21 @@ const SQL = {
 
 // ========================= node/src 라우터 & 미들웨어 =========================
 
-const { requireAuth } = require("./node/src/middleware/auth");
+const { requireAuth }      = require("./middleware/auth");
 
-const authRoutes         = require("./node/src/routes/auth");
-const reportRoutes       = require("./node/src/routes/report");
-const commentRoutes      = require("./node/src/routes/comment.router");
-const legacyPostsRouter  = require("./node/src/routes/posts.router");
-const recoveryRoutes     = require("./node/src/routes/recovery");
-const alertsRoutes       = require("./node/src/routes/alerts");
-const postReactionRoutes = require("./node/src/routes/post.reaction.router");
-const googleOAuth        = require("./node/src/routes/oauth.google");
-const naverOAuth         = require("./node/src/routes/oauth.naver");
-const kakaoOAuth         = require("./node/src/routes/oauth.kakao");
+const authRoutes           = require("./routes/auth");
+const reportRoutes         = require("./routes/report");
+const commentRoutes        = require("./routes/comment.router");
+const legacyPostsRouter    = require("./routes/posts.router");
+const recoveryRoutes       = require("./routes/recovery");
+const alertsRoutes         = require("./routes/alerts");
+const postReactionRoutes   = require("./routes/post.reaction.router");
+const googleOAuth          = require("./routes/oauth.google");
+const naverOAuth           = require("./routes/oauth.naver");
+const kakaoOAuth           = require("./routes/oauth.kakao");
 
-const imagePreviewRoutes = require("./routes/image-previews");
-const mosaicPostsRouter  = require("./routes/posts");   // /api/posts
+const imagePreviewRoutes   = require("./routes/image-previews");
+const mosaicPostsRouter    = require("./routes/posts");   // /api/posts
 
 // ========================= 앱 / 서버 / 소켓 =========================
 
@@ -225,8 +226,8 @@ app.get("/api/gallery", (req, res) => {
 // ========================= 인증 / 유저 / OAuth =========================
 
 app.use("/api/auth", authRoutes);
-app.use("/api/auth/google", googleOAuth);
-app.use("/api/auth/naver", naverOAuth);
+app.use("/api/oauth/google", googleOAuth);
+app.use("/api/oauth/naver", naverOAuth);
 app.use("/api/oauth/kakao", kakaoOAuth);
 
 app.get("/api/me", requireAuth, (req, res) => res.json({ me: req.user }));
@@ -412,5 +413,3 @@ app.use((err, req, res, _next) => {
 server.listen(PORT, () => {
   console.log(`API & Socket server running on http://localhost:${PORT}`);
 });
-
-*/
