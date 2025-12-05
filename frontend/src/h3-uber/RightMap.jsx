@@ -1,4 +1,3 @@
-/*
 import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Polygon, Marker, Popup } from "react-leaflet";
 import { cellToBoundary, latLngToCell } from "h3-js";
@@ -53,11 +52,13 @@ export default function RightMap() {
         zoom={15}
         style={{ width: "100%", height: "100%" }}
       >
+        {/* 🔁 OSM → 백엔드 프록시 타일 사용 */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
           url="/tiles/{z}/{x}/{y}.png"
         />
 
+        {/* 🔹 서버(/api/map)에서 내려온 포인트들 */}
         {points.map((p, i) => {
           const hasLat = p.lat !== null && p.lat !== undefined;
           const hasLng = p.lng !== null && p.lng !== undefined;
@@ -80,6 +81,7 @@ export default function RightMap() {
 
           return (
             <React.Fragment key={p.id ?? `${i}-${lat},${lng}`}>
+              {/* 핀 주변 작은 육각형 */}
               {Array.isArray(boundary) && boundary.length >= 3 && (
                 <Polygon
                   positions={boundary}
@@ -92,6 +94,7 @@ export default function RightMap() {
                 />
               )}
 
+              {/* 마커(핀) */}
               <Marker position={[lat, lng]}>
                 <Popup>
                   <strong>{p.title || "제목 없음"}</strong>
@@ -106,5 +109,3 @@ export default function RightMap() {
     </div>
   );
 }
-
-*/
