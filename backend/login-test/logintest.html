@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>OAuth 로그인 & 좋아요 테스트</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f7f7f7;
+    }
+
+    h1 { text-align: center; }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      text-align: center;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      border: none;
+    }
+
+    .google { background: #ffffff; border: 1px solid #ccc; }
+    .kakao  { background: #fee500; }
+    .naver  { background: #03c75a; color: white; }
+
+    .logout {
+      margin-top: 20px;
+      background: #e53e3e;
+      color: white;
+    }
+
+    .card {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      word-break: break-all;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>OAuth 로그인 테스트</h1>
+
+  <!-- 로그인 버튼들 -->
+  <button class="btn google" onclick="login('google')">Google 로그인</button>
+  <button class="btn kakao" onclick="login('kakao')">Kakao 로그인</button>
+  <button class="btn naver" onclick="login('naver')">Naver 로그인</button>
+
+  <div id="result"></div>
+
+  <!-- 좋아요 테스트 버튼 -->
+  <button class="btn" style="background:#4a90e2; color:#fff;" onclick="likeTest(1)">
+    👍 게시글 1번 좋아요 테스트
+  </button>
+
+<script>
+  const API_BASE = "http://localhost:8080/api/oauth";
+
+  /* 로그인 버튼 클릭 */
+  function login(provider) {
+    window.location.href = `${API_BASE}/${provider}/login`;
+  }
+
+  /* JWT 디코딩 */
+  function parseJwt(token) {
+    try {
+      const base64 = token.split('.')[1]
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+      return JSON.parse(atob(base64));
+    } catch {
+      return null;
+    }
+  }
+
+  /* OAuth 콜백 처리 */
+  function handleCallback() {
+    if (!location.hash) return;
+
+    const hash = location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+
+    const provider = params.get("provider");
+    const token = params.get("token");
+
+    if (!token) return;
+
+    const payload = parseJwt(token);
+
+    // 토큰 저장
+    localStorage.setItem("oauth_token", token);
+    localStorage.setItem("oauth_provider", provider);
+
+    renderUserInfo(provider, token, payload);
+
+    // URL 깔끔하게 정리 (# 제거)
+    history.replaceState(null, "", location.pathname);
+  }
+
+  /* 로그인 정보 출력 */
+  function renderUserInfo(provider, token, payload) {
+    document.getElementById("result").innerHTML = `
+      <div class="card">
+        <h3>로그인 Provider</h3>
+        <p><b>${provider}</b></p>
+
+        <h3>JWT Token</h3>
+        <pre>${token}</pre>
+
+        <h3>Payload</h3>
+        <pre>${JSON.stringify(payload, null, 2)}</pre>
+
+        <button class="btn logout" onclick="logout()">로그아웃</button>
+      </div>
+    `;
+  }
+
+  /* 로그아웃 */
+  function logout() {
+    localStorage.removeItem("oauth_token");
+    localStorage.removeItem("oauth_provider");
+    location.reload();
+  }
+
+  /* 새로고침 시 토큰 복원 */
+  function restoreLogin() {
+    const token = localStorage.getItem("oauth_token");
+    const provider = localStorage.getItem("oauth_provider");
+
+    if (!token) return;
+
+    const payload = parseJwt(token);
+    renderUserInfo(provider, token, payload);
+  }
+
+  /* 좋아요 테스트 API */
+  async function likeTest(postId) {
+    const token = localStorage.getItem("oauth_token");
+
+    if (!token) {
+      alert("먼저 로그인하세요!");
+      return;
+    }
+
+    const res = await fetch(`http://localhost:8080/api/posts/${postId}/reactions/like`, {
+      method: 'POST',
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    const data = await res.json();
+    console.log("좋아요 API 응답:", data);
+
+    alert(data.liked ? "👍 좋아요 성공" : "💔 좋아요 취소");
+  }
+
+  /* 페이지 로드 시 */
+  window.onload = () => {
+    handleCallback();
+    restoreLogin();
+  };
+</script>
+</body>
+</html>
