@@ -375,6 +375,7 @@ app.get("/api/map", async (req, res) => {
   }
 });
 
+/*
 // ========================= OSM 타일 프록시 (/tiles/*) =========================
 
 app.get("/tiles/:z/:x/:y.png", async (req, res) => {
@@ -401,6 +402,7 @@ app.get("/tiles/:z/:x/:y.png", async (req, res) => {
     res.status(502).end();
   }
 });
+*/
 
 // ========================= Socket.IO (채팅) =========================
 
