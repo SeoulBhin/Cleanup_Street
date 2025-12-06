@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const { requireAuth } = require("../node/src/middleware/auth");
+const { requireAuth } = require("../middleware/auth");
 const { latLngToCell } = require("h3-js");
 
 /**
