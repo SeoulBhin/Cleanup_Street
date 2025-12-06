@@ -98,6 +98,7 @@ jobs:
             -e DB_USER="${DB_USER}" \
             -e DB_PASSWORD="${DB_PASSWORD}" \
             -e DB_DATABASE="${DB_DATABASE}" \
+            -e KAKAO_REST_API_KEY_Value="${{ secrets.KAKAO_REST_API_KEY_Value }}" \
             ${BE_IMAGE}:${IMAGE_TAG}
 
           # Frontend

@@ -18,8 +18,7 @@ export default function PostForm() {
     category: FORUM_CATEGORIES[0],
     content: "",
     attachments: [],
-    address: "",     // ✅ 주소 필드 추가
-    // (필요하면 lat/lng 나중에 추가)
+    address: "", // ✅ 주소 필드
   });
 
   useEffect(() => {
@@ -30,8 +29,8 @@ export default function PostForm() {
           title: p.title || "",
           category: p.category || FORUM_CATEGORIES[0],
           content: p.content || "",
-          attachments: p.attachments || [],
-          address: p.address || "",   // ✅ 서버에 address가 있으면 채움
+          attachments: (p.images || []).map((img) => img.imageUrl) || [],
+          address: p.address || "",
         })
       )
       .catch(() => {});
@@ -47,8 +46,13 @@ export default function PostForm() {
     if (!files || files.length === 0) return;
     try {
       const { urls } = await uploadFiles(files);
-      setForm((s) => ({ ...s, attachments: [...(s.attachments || []), ...urls] }));
-    } catch {}
+      setForm((s) => ({
+        ...s,
+        attachments: [...(s.attachments || []), ...urls],
+      }));
+    } catch {
+      alert("파일 업로드 중 오류가 발생했습니다.");
+    }
   };
 
   const onSubmit = async (e) => {
@@ -57,29 +61,32 @@ export default function PostForm() {
       alert("제목/내용을 입력하세요.");
       return;
     }
+
     const payload = {
       title: form.title,
       content: form.content,
-      author: "로그인한유저",
+      author: "로그인한유저", // 실제로는 서버에서 req.user 로 처리
       boardType,
       category: form.category,
       attachments: form.attachments || [],
-      address: form.address?.trim() || null,   // ✅ 주소 포함해서 보냄
+      address: form.address?.trim() || null,
     };
 
     try {
-      // 수정 부분만
-if (isEdit) {
-  await updateBoardPost(boardType, id, payload);
-  navigate(`/board/${boardType}/${id}`);
-} else {
-  const created = await createBoardPost(boardType, payload);
-  navigate(`/board/${boardType}/${created.id}`);
-}
-
+      if (isEdit) {
+        await updateBoardPost(boardType, id, payload);
+        navigate(`/board/${boardType}/${id}`);
+      } else {
+        const created = await createBoardPost(boardType, payload);
+        navigate(`/board/${boardType}/${created.id}`);
+      }
     } catch (err) {
       if (err?.status === 401) {
         alert("로그인을 하십시오.");
+      } else if (err?.status === 400 && err?.code === "INVALID_ADDRESS") {
+        alert("주소를 찾을 수 없습니다. 다시 확인해 주세요.");
+      } else if (err?.status === 502 && err?.code === "GEOCODE_FAILED") {
+        alert("주소를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
       } else {
         alert("저장 중 오류가 발생했습니다.");
       }
@@ -118,7 +125,6 @@ if (isEdit) {
           </select>
         </div>
 
-        {/* ✅ 주소 입력만 추가 */}
         <div className="form-group">
           <label>주소</label>
           <input
@@ -161,7 +167,11 @@ if (isEdit) {
         </div>
 
         <div className="form-actions">
-          <button type="button" className="form-btn btn-cancel" onClick={() => navigate(-1)}>
+          <button
+            type="button"
+            className="form-btn btn-cancel"
+            onClick={() => navigate(-1)}
+          >
             취소
           </button>
           <button type="submit" className="form-btn btn-submit">

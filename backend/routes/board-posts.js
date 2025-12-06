@@ -4,6 +4,7 @@ const router = express.Router();
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
 const { latLngToCell } = require("h3-js");
+const { geocodeAddress } = require("../utils/geocode");
 
 /**
  * 공통 SELECT 구문
@@ -20,6 +21,7 @@ const BASE_SELECT = `
     p.status,
     p.comment_count,
     p.h3_index,
+    p.address,
     p.latitude,
     p.longitude,
     p.created_at,
@@ -52,6 +54,86 @@ const fetchPostById = async (postId) => {
   const { rows } = await db.query(query, [postId]);
   return rows[0];
 };
+
+/**
+ * 주소 처리 공통 함수
+ * - latitude/longitude 가 이미 있으면 그걸 우선 사용
+ * - 없고 address 가 있으면 카카오 지오코딩으로 lat/lng 계산
+ * - 지오코딩 실패 시 { error: {status, body} }
+ */
+async function resolveLocation({ latitude, longitude, address }) {
+  let lat = null;
+  let lng = null;
+  let normalizedAddress = (address || "").trim() || null;
+
+  // 1) 클라이언트가 lat/lng 직접 준 경우
+  if (latitude != null && longitude != null && latitude !== "" && longitude !== "") {
+    lat = Number(latitude);
+    lng = Number(longitude);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return {
+        error: {
+          status: 400,
+          body: {
+            code: "INVALID_COORD",
+            message: "좌표값이 올바르지 않습니다.",
+          },
+        },
+      };
+    }
+    return { lat, lng, address: normalizedAddress };
+  }
+
+  // 2) 좌표는 없고 address 텍스트만 존재하는 경우 → 카카오 지오코딩
+  if (normalizedAddress) {
+    const geo = await geocodeAddress(normalizedAddress);
+    if (!geo) {
+      return {
+        error: {
+          status: 400,
+          body: {
+            code: "INVALID_ADDRESS",
+            message: "주소를 찾을 수 없습니다. 다시 확인해 주세요.",
+          },
+        },
+      };
+    }
+    return {
+      lat: geo.lat,
+      lng: geo.lng,
+      address: geo.normalizedAddress,
+    };
+  }
+
+  // 3) 주소/좌표 둘 다 없는 경우 → 위치 정보 없이 저장
+  return { lat: null, lng: null, address: null };
+}
+
+/**
+ * lat/lng → H3, location WKT 계산
+ */
+function buildSpatialFields(lat, lng) {
+  if (lat == null || lng == null) {
+    return {
+      h3_index: null,
+      location: null,
+    };
+  }
+
+  // H3 index (hex 문자열 → BIGINT)
+  const hexIndex = latLngToCell(lat, lng, 10); // ex) "8a2a1072b59ffff"
+  let h3_index = null;
+  try {
+    h3_index = BigInt("0x" + hexIndex); // BIGINT 컬럼에 저장
+  } catch {
+    h3_index = null;
+  }
+
+  // PostGIS geography(Point, 4326)
+  const location = `SRID=4326;POINT(${lng} ${lat})`;
+
+  return { h3_index, location };
+}
 
 // ================================
 // 목록 조회  GET /api/board-posts
@@ -98,7 +180,7 @@ router.get("/:id", async (req, res, next) => {
 
 // ================================
 // 게시글 생성  POST /api/board-posts
-// body: { title, content, category, latitude?, longitude? ... }
+// body: { title, content, category, address?, latitude?, longitude?, attachments? }
 // ================================
 router.post("/", requireAuth, async (req, res, next) => {
   try {
@@ -106,54 +188,75 @@ router.post("/", requireAuth, async (req, res, next) => {
       title,
       content,
       category,
+      address,
       latitude = null,
       longitude = null,
-      // author, address, attachments 등은
-      // posts 테이블에 컬럼이 없으므로 일단 무시 (나중에 컬럼 추가 가능)
+      attachments = [],
     } = req.body;
 
     if (!title || !content || !category) {
-      return res.status(400).json({ message: "필수 값 누락 (title / content / category)" });
+      return res
+        .status(400)
+        .json({ message: "필수 값 누락 (title / content / category)", code: "MISSING_FIELDS" });
     }
 
-    let h3_index = null;
-    let location = null;
-
-    if (latitude && longitude) {
-      const lat = Number(latitude);
-      const lng = Number(longitude);
-      // H3 index 계산 (해상도 10 예시)
-      const cell = latLngToCell(lat, lng, 10);
-      // BIGINT 컬럼에 넣기 위해 문자열 또는 BigInt 사용
-      h3_index = BigInt(cell);
-      // PostGIS geography(Point, 4326)
-      location = `SRID=4326;POINT(${lng} ${lat})`;
+    // 1) 주소/좌표 처리 (지오코딩 포함)
+    const locResult = await resolveLocation({ latitude, longitude, address });
+    if (locResult.error) {
+      return res.status(locResult.error.status).json(locResult.error.body);
     }
+    const resolvedLat = locResult.lat;
+    const resolvedLng = locResult.lng;
+    const resolvedAddress = locResult.address;
 
+    // 2) H3, location 계산
+    const { h3_index, location } = buildSpatialFields(resolvedLat, resolvedLng);
+
+    // 3) posts INSERT
     const insertQuery = `
       INSERT INTO posts
         (user_id, title, content, category,
-         latitude, longitude, h3_index, location,
+         address, latitude, longitude, h3_index, location,
          status, created_at, updated_at)
       VALUES
         ($1, $2, $3, $4,
-         $5, $6, $7, $8,
+         $5, $6, $7, $8, $9,
          'DONE', NOW(), NOW())
       RETURNING post_id AS id
     `;
 
     const { rows } = await db.query(insertQuery, [
-      req.user.user_id,
+      req.user.user_id,           // 로그인한 유저
       title,
       content,
       category,
-      latitude || null,
-      longitude || null,
+      resolvedAddress,
+      resolvedLat,
+      resolvedLng,
       h3_index,
       location,
     ]);
 
-    res.json({ id: rows[0].id });
+    const postId = rows[0].id;
+
+    // 4) 첨부 이미지가 있으면 post_images에 저장
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const params = [postId];
+      const values = attachments.map((url, idx) => {
+        params.push(url);
+        return `($1, $${idx + 2}, 'ORIGINAL')`;
+      });
+
+      await db.query(
+        `
+        INSERT INTO post_images (post_id, image_url, variant)
+        VALUES ${values.join(",")}
+        `,
+        params
+      );
+    }
+
+    res.json({ id: postId });
   } catch (err) {
     next(err);
   }
@@ -161,6 +264,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
 // ================================
 // 게시글 수정  PUT /api/board-posts/:id
+// body: { title, content, category, address?, latitude?, longitude?, attachments? }
 // ================================
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
@@ -169,51 +273,87 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       title,
       content,
       category,
+      address,
       latitude = null,
       longitude = null,
+      attachments = [],
     } = req.body;
 
     if (!title || !content || !category) {
-      return res.status(400).json({ message: "필수 값 누락 (title / content / category)" });
+      return res
+        .status(400)
+        .json({ message: "필수 값 누락 (title / content / category)", code: "MISSING_FIELDS" });
     }
 
-    let h3_index = null;
-    let location = null;
+    // (선택) 소유권 체크 로직 추가 가능
+    // const { rows: ownerRows } = await db.query(
+    //   "SELECT user_id FROM posts WHERE post_id = $1",
+    //   [id]
+    // );
+    // if (!ownerRows.length || ownerRows[0].user_id !== req.user.user_id) {
+    //   return res.status(403).json({ message: "수정 권한이 없습니다." });
+    // }
 
-    if (latitude && longitude) {
-      const lat = Number(latitude);
-      const lng = Number(longitude);
-      const cell = latLngToCell(lat, lng, 10);
-      h3_index = BigInt(cell);
-      location = `SRID=4326;POINT(${lng} ${lat})`;
+    // 1) 주소/좌표 처리 (지오코딩 포함)
+    const locResult = await resolveLocation({ latitude, longitude, address });
+    if (locResult.error) {
+      return res.status(locResult.error.status).json(locResult.error.body);
     }
+    const resolvedLat = locResult.lat;
+    const resolvedLng = locResult.lng;
+    const resolvedAddress = locResult.address;
 
+    // 2) H3, location 계산
+    const { h3_index, location } = buildSpatialFields(resolvedLat, resolvedLng);
+
+    // 3) posts UPDATE
     const updateQuery = `
       UPDATE posts
       SET
         title      = $1,
         content    = $2,
         category   = $3,
-        latitude   = $4,
-        longitude  = $5,
-        h3_index   = $6,
-        location   = $7,
+        address    = $4,
+        latitude   = $5,
+        longitude  = $6,
+        h3_index   = $7,
+        location   = $8,
         updated_at = NOW()
-      WHERE post_id = $8
+      WHERE post_id = $9
     `;
 
     await db.query(updateQuery, [
       title,
       content,
       category,
-      latitude || null,
-      longitude || null,
+      resolvedAddress,
+      resolvedLat,
+      resolvedLng,
       h3_index,
       location,
       id,
     ]);
 
-    res.json({ success: true });
+    // 4) 첨부 이미지 갱신 (간단히: 기존 삭제 후 재삽입)
+    await db.query(`DELETE FROM post_images WHERE post_id = $1`, [id]);
+
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const params = [id];
+      const values = attachments.map((url, idx) => {
+        params.push(url);
+        return `($1, $${idx + 2}, 'ORIGINAL')`;
+      });
+
+      await db.query(
+        `
+        INSERT INTO post_images (post_id, image_url, variant)
+        VALUES ${values.join(",")}
+        `,
+        params
+      );
+    }
+
+    res.json({ success: true, id: Number(id) });
   } catch (err) {
     next(err);
   }
@@ -226,10 +366,8 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // 이미지가 있다면 post_images 먼저 삭제
     await db.query(`DELETE FROM post_images WHERE post_id = $1`, [id]);
-    // 본문 삭제
-    await db.query(`DELETE FROM posts WHERE post_id = $1`, [id]);
+    await db.query(`DELETE FROM posts       WHERE post_id = $1`, [id]);
 
     res.json({ success: true });
   } catch (err) {
