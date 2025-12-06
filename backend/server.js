@@ -162,21 +162,21 @@ const CHAT_SQL = {
 
 // ========================= node/src 라우터 & 미들웨어 =========================
 
-const { requireAuth }      = require("../middleware/auth");
+const { requireAuth }      = require("./middleware/auth");
 
-const authRoutes           = require("../routes/auth");
-const reportRoutes         = require("../routes/report");
-const commentRoutes        = require("../routes/comment.router");
-const legacyPostsRouter    = require("../routes/posts.router");
-const recoveryRoutes       = require("../routes/recovery");
-const alertsRoutes         = require("../routes/alerts");
-const postReactionRoutes   = require("../routes/post.reaction.router");
-const googleOAuth          = require("../routes/oauth.google");
-const naverOAuth           = require("../routes/oauth.naver");
-const kakaoOAuth           = require("../routes/oauth.kakao");
+const authRoutes           = require("./routes/auth");
+const reportRoutes         = require("./routes/report");
+const commentRoutes        = require("./routes/comment.router");
+const legacyPostsRouter    = require("./routes/posts.router");
+const recoveryRoutes       = require("./routes/recovery");
+const alertsRoutes         = require("./routes/alerts");
+const postReactionRoutes   = require("./routes/post.reaction.router");
+const googleOAuth          = require("./routes/oauth.google");
+const naverOAuth           = require("./routes/oauth.naver");
+const kakaoOAuth           = require("./routes/oauth.kakao");
 
-const imagePreviewRoutes   = require("../routes/image-previews");
-const mosaicPostsRouter    = require("../routes/posts");   // /api/posts
+const imagePreviewRoutes   = require("./routes/image-previews");
+const mosaicPostsRouter    = require("./routes/posts");   // /api/posts
 // 🔥 새로 추가해야 하는 라우터
 const boardPostsRouter   = require("../routes/board-posts");
 // ========================= 앱 / 서버 / 소켓 =========================
