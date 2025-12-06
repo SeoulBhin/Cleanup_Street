@@ -1,4 +1,4 @@
-export const apiBase = process.env.REACT_APP_API_BASE || "";
+export const apiBase = process.env.REACT_APP_API_BASE_URL || "";
 
 // 공통 fetch 함수
 async function request(path, opts = {}) {
