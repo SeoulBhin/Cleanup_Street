@@ -217,6 +217,9 @@ app.use(express.static(BUILD_DIR));                // React build
 // 헬스 체크
 app.get("/health", (_, res) => res.json({ status: "UP" }));
 
+app.get("/api/hello", (req, res) => {
+  res.status(200).json({ message: "cleanup street backend alive" });
+});
 // ========================= 공지 / 갤러리 API =========================
 
 app.get("/api/announcements", (req, res) => {
