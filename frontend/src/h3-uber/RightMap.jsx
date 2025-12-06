@@ -54,10 +54,9 @@ export default function RightMap() {
       >
         {/* 🔁 OSM → 백엔드 프록시 타일 사용 */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-          url="/tiles/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-
         {/* 🔹 서버(/api/map)에서 내려온 포인트들 */}
         {points.map((p, i) => {
           const hasLat = p.lat !== null && p.lat !== undefined;
