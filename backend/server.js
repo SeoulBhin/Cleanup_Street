@@ -178,7 +178,7 @@ const kakaoOAuth           = require("./routes/oauth.kakao");
 const imagePreviewRoutes   = require("./routes/image-previews");
 const mosaicPostsRouter    = require("./routes/posts");   // /api/posts
 // 🔥 새로 추가해야 하는 라우터
-const boardPostsRouter   = require("../routes/board-posts");
+const boardPostsRouter   = require("./routes/board-posts");
 // ========================= 앱 / 서버 / 소켓 =========================
 
 const app = express();
