@@ -78,7 +78,11 @@ if (isEdit) {
 }
 
     } catch (err) {
-      alert("저장 중 오류");
+      if (err?.status === 401) {
+        alert("로그인을 하십시오.");
+      } else {
+        alert("저장 중 오류가 발생했습니다.");
+      }
     }
   };
 
