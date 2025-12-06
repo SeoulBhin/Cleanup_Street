@@ -285,7 +285,7 @@ app.use("/api/board-posts", boardPostsRouter);
 
 app.post(
   "/api/uploads",
-  requireAuth,
+  // requireAuth,   // ⛔ 잠깐 주석 처리 (또는 삭제)
   upload.array("files", 10),
   (req, res) => {
     const proto = req.headers["x-forwarded-proto"] || req.protocol;
