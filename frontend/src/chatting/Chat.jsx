@@ -9,8 +9,8 @@ export default function Chat() {
   const socketRef = useRef(null);
 
   useEffect(() => {
+    // CRA에서는 import.meta를 지원하지 않으므로 REACT_APP_*만 사용한다.
     const url =
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_SOCKET_URL) ||
       (typeof process !== "undefined" && process.env?.REACT_APP_SOCKET_URL) ||
       (typeof process !== "undefined" && process.env?.REACT_APP_API_BASE) ||
       window.location.origin;
