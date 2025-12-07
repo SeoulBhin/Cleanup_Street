@@ -23,7 +23,7 @@ export default function Chat() {
     socketRef.current = s;
     s.emit("join", { roomId });
     
-    // 💡 안 읽은 메시지 처리: 채팅방 진입 시 '읽음' 신호를 서버에 전송합니다.
+    // 안 읽은 메시지 처리: 채팅방 진입 시 '읽음' 신호를 서버에 전송합니다.
     s.emit("read_messages", { roomId }); 
 
     const onMsg = (m) => setLogs((prev) => [...prev, m]);
@@ -61,14 +61,13 @@ export default function Chat() {
         {logs.map((m, i) => (
           <div 
             key={i} 
-            // 'from' 필드를 사용하여 내 메시지/상대방 메시지 구분
             className={`chat-message ${m.from === "me" ? "message-me" : "message-other"}`}
           >
             <span className="message-time">
               {new Date(m.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
             <span className="message-bubble">{m.text ?? String(m)}</span>
-            {/* 💡 안 읽은 메시지 배지 (실제로는 서버 데이터에 의존해야 함) */}
+            {/* 안 읽은 메시지 배지 (실제로는 서버 데이터에 의존해야 함) */}
             {/* <span className="unread-badge">1</span> */}
           </div>
         ))}
