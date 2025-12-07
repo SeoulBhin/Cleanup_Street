@@ -451,14 +451,6 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
  opacity: 0.9;
 }
 
-/* 이미지 전체를 감싸는 링크 */
-.gallery-link {
-  display: block;
-  width: 100%;
-  height: 100%;
-  text-decoration: none;   /* 밑줄 제거 */
-  color: inherit;          /* 글자색 상속 */
-}
 /* ===================================================================================
    Gallery Styles
    =================================================================================== */
@@ -648,18 +640,8 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
  width: 100%;
  }
 }
-.home-map-wrapper {
-  width: 100%;
-  height: calc(100vh - 150px); /* 헤더/네비 제외 전체 채우기 */
-  padding: 0;
-  margin: 0;
-}
 
-.leaflet-container {
-  width: 100% !important;
-  height: 100% !important;
-  z-index: 1;
-}
+
 /* 1. 모달 배경 및 중앙 정렬 */
 .modal-backdrop {
   /* 화면 전체를 덮는 투명한 배경 */
@@ -801,6 +783,9 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
 .text-link:hover {
   text-decoration: underline;
 }
+/* ===================================================================================
+    Modal Styles (하단 링크 섹션에 추가)
+    =================================================================================== */
 
 .modal-footer-links a,
 .modal-footer-links button.link-as-button { /* <button>에 대한 스타일 추가/확장 */
