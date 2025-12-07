@@ -807,3 +807,140 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     color: #3b54e3;
     text-decoration: underline;
 }
+/*채팅방 CSS */
+/* ===================================================================================
+   Chat Component Styles
+   =================================================================================== */
+
+/* 전체 컨테이너 및 제목 */
+.chat-page-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.chat-title {
+    font-size: 1.5rem;
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #4c62f3;
+}
+
+/* 채팅 로그 박스 */
+.chat-log-box {
+    height: 400px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    background-color: #f7f9fb;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 개별 메시지 컨테이너 */
+.chat-message {
+    display: flex;
+    max-width: 90%;
+    align-items: flex-end;
+    position: relative; /* 배지 위치 기준 */
+}
+
+/* 다른 사람 메시지 (좌측 정렬) */
+.message-other {
+    align-self: flex-start;
+}
+
+/* 내 메시지 (우측 정렬) */
+.message-me {
+    align-self: flex-end;
+    flex-direction: row-reverse; /* 시계/버블 순서 변경 */
+}
+
+/* 메시지 시계 */
+.message-time {
+    font-size: 0.75rem;
+    color: #95a5a6;
+    margin: 0 8px;
+    white-space: nowrap;
+}
+
+/* 메시지 버블 스타일 */
+.message-bubble {
+    padding: 10px 14px;
+    border-radius: 18px;
+    line-height: 1.4;
+    word-break: break-word;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+    max-width: 100%;
+}
+
+/* 다른 사람 메시지 버블 */
+.message-other .message-bubble {
+    background-color: #ffffff;
+    color: #333;
+    border-bottom-left-radius: 2px;
+}
+
+/* 내 메시지 버블 */
+.message-me .message-bubble {
+    background-color: #4c62f3;
+    color: white;
+    border-bottom-right-radius: 2px;
+}
+
+/* 안 읽은 메시지 배지 스타일 (읽지 않았을 때 '1'을 표시) */
+.unread-badge {
+    position: absolute;
+    bottom: -5px; /* 시계 아래에 배치 */
+    right: -15px;
+    background-color: transparent;
+    color: #4c62f3; /* 파란색으로 표시 (읽지 않음을 강조) */
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+/* 상대방 메시지에 대한 배지 위치 조정 */
+.message-other .unread-badge {
+    left: -15px;
+    right: auto;
+}
+
+
+/* 입력 영역 */
+.chat-input-area {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.chat-textarea {
+    flex: 1;
+    min-height: 60px;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.chat-textarea:focus {
+    outline: none;
+    border-color: #4c62f3;
+}
+
+.chat-send-btn {
+    padding: 10px 20px;
+    font-weight: 600;
+    white-space: nowrap;
+    height: 40px;
+}
