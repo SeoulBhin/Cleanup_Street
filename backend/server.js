@@ -189,6 +189,24 @@ const io = new Server(server, {
     credentials: true,
   },
 });
+// ===== Redis Adapter 설정 =====
+const { createAdapter } = require("@socket.io/redis-adapter");
+const { createClient } = require("redis");
+
+(async () => {
+  const pubClient = createClient({
+    url: "redis://:0000@127.0.0.1:6379"
+  });
+  const subClient = pubClient.duplicate();
+
+  await pubClient.connect();
+  await subClient.connect();
+
+  io.adapter(createAdapter(pubClient, subClient));
+
+  console.log("🔗 Redis Adapter connected (Socket.IO clustering 활성화)");
+})();
+
 
 // ========================= 글로벌 미들웨어 =========================
 
