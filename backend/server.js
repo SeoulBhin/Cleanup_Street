@@ -13,6 +13,7 @@ const cookieParser = require("cookie-parser");
 const multer = require("multer");
 const { Server } = require("socket.io");
 const fetch = require("node-fetch");
+const { pingRedis } = require("./utils/redisClient");
 
 // PostgreSQL 래퍼
 const db = require("./db");
@@ -216,7 +217,18 @@ app.use(express.static(BUILD_DIR));                // React build
 
 console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
 // 헬스 체크
-app.get("/health", (_, res) => res.json({ status: "UP" }));
+app.get("/health", async (_, res) => {
+  let redisStatus = "unknown";
+
+  try {
+    redisStatus = (await pingRedis()) ? "ok" : "down";
+  } catch (err) {
+    console.error("Redis health check failed:", err?.message || err);
+    redisStatus = "down";
+  }
+
+  res.json({ status: "UP", redis: redisStatus });
+});
 
 app.get("/api/hello", (req, res) => {
   res.status(200).json({ message: "cleanup street backend alive" });

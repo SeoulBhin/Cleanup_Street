@@ -15,6 +15,11 @@ services:
       - DB_PASSWORD=1234
       - DB_DATABASE=cleanup
       - DB_PORT=5433
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=0000
+    depends_on:
+      - redis
 
   frontend:
     build:
@@ -27,4 +32,17 @@ services:
       - "80:80"
     depends_on:
       - backend
-# docker-compose.yml 파일 중...
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "0000"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+    driver: local
