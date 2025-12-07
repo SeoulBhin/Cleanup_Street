@@ -28,8 +28,8 @@ services:
       args:
         - REACT_APP_API_BASE_URL=http://52.63.57.185:9090
     ports:
-      # Serve frontend on port 80 so http://52.63.57.185/ loads the app.
-      - "80:80"
+      # Host port 8081 -> container 80 to avoid clash with host nginx on 80.
+      - "8081:80"
     depends_on:
       - backend
       - redis
