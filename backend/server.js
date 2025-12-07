@@ -27,6 +27,12 @@ const ALLOW_ORIGINS = [
   "http://127.0.0.1:5173",
   //"http://watchout.com", // 배포 후 도메인 여기에 추가
 ];
+const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
+const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
+const REDIS_URL = REDIS_PASSWORD
+  ? `redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`
+  : `redis://${REDIS_HOST}:${REDIS_PORT}`;
 
 // React 빌드 폴더 (frontend/build)
 const BUILD_DIR = path.join(__dirname, "..", "frontend", "build");
@@ -195,17 +201,27 @@ const { createAdapter } = require("@socket.io/redis-adapter");
 const { createClient } = require("redis");
 
 (async () => {
-  const pubClient = createClient({
-    url: "redis://:0000@127.0.0.1:6379"
-  });
-  const subClient = pubClient.duplicate();
+  try {
+    const pubClient = createClient({ url: REDIS_URL });
+    const subClient = pubClient.duplicate();
 
-  await pubClient.connect();
-  await subClient.connect();
+    pubClient.on("error", (err) =>
+      console.error("❌ Redis pubClient error:", err?.message || err)
+    );
+    subClient.on("error", (err) =>
+      console.error("❌ Redis subClient error:", err?.message || err)
+    );
 
-  io.adapter(createAdapter(pubClient, subClient));
+    await pubClient.connect();
+    await subClient.connect();
 
-  console.log("🔗 Redis Adapter connected (Socket.IO clustering 활성화)");
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log(
+      `🔗 Redis Adapter connected → ${REDIS_HOST}:${REDIS_PORT} (Socket.IO clustering 활성화)`
+    );
+  } catch (err) {
+    console.error("❌ Redis Adapter init failed:", err?.message || err);
+  }
 })();
 
 

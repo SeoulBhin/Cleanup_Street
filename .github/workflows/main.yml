@@ -74,6 +74,16 @@ jobs:
           # Ensure shared network for app + redis
           docker network create cleanup-net || true
 
+          # Defaults (secrets may be empty in self-hosted runner)
+          DB_HOST=${DB_HOST:-52.63.57.185}
+          DB_PORT=${DB_PORT:-5433}
+          DB_USER=${DB_USER:-user}
+          DB_PASSWORD=${DB_PASSWORD:-1234}
+          DB_DATABASE=${DB_DATABASE:-cleanup}
+          REDIS_HOST=${REDIS_HOST:-cleanup-redis}
+          REDIS_PORT=${REDIS_PORT:-6379}
+          REDIS_PASSWORD=${REDIS_PASSWORD:-0000}
+
           # Decide next colors
           BE_EXISTING=$(docker ps -q -f name=${BE_PREFIX}-blue || true)
           if [ -z "$BE_EXISTING" ]; then
