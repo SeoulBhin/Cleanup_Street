@@ -65,8 +65,14 @@ jobs:
           DB_USER: user
           DB_PASSWORD: 1234
           DB_DATABASE: cleanup
+          REDIS_HOST: cleanup-redis
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
+
+          # Ensure shared network for app + redis
+          docker network create cleanup-net || true
 
           # Decide next colors
           BE_EXISTING=$(docker ps -q -f name=${BE_PREFIX}-blue || true)
@@ -92,17 +98,22 @@ jobs:
           # Run new containers
           # Backend: Pass DB env vars
           docker run -d --name ${BE_PREFIX}-${BE_NEW_COLOR} -p ${BE_NEW_PORT}:8080 \
+            --network cleanup-net \
             -e PORT=8080 \
             -e DB_HOST="${DB_HOST}" \
             -e DB_PORT="${DB_PORT}" \
             -e DB_USER="${DB_USER}" \
             -e DB_PASSWORD="${DB_PASSWORD}" \
             -e DB_DATABASE="${DB_DATABASE}" \
+            -e REDIS_HOST="${REDIS_HOST}" \
+            -e REDIS_PORT="${REDIS_PORT}" \
+            -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
             -e KAKAO_REST_API_KEY_Value="${{ secrets.KAKAO_REST_API_KEY_Value }}" \
             ${BE_IMAGE}:${IMAGE_TAG}
 
           # Frontend
           docker run -d --name ${FE_PREFIX}-${FE_NEW_COLOR} -p ${FE_NEW_PORT}:80 \
+            --network cleanup-net \
             ${FE_IMAGE}:${IMAGE_TAG}
 
           echo "⏳ Waiting for warm-up..."
