@@ -63,6 +63,7 @@ jobs:
         RETRIES: 10
         RETRY_INTERVAL: 5
         IMAGE_TAG: ${{ github.sha }}
+        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       run: |
         echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
 
@@ -72,6 +73,12 @@ jobs:
         DB_USER=${DB_USER:-user}
         DB_PASSWORD=${DB_PASSWORD:-1234}
         DB_DATABASE=${DB_DATABASE:-cleanup}
+        REDIS_HOST=${REDIS_HOST:-cleanup-redis}
+        REDIS_PORT=${REDIS_PORT:-6379}
+        REDIS_PASSWORD=${REDIS_PASSWORD:-0000}
+
+        # Ensure shared network exists (Redis + app)
+        docker network create cleanup-net || true
 
         EXISTING_BLUE=$(docker ps -q -f name=${CONTAINER_PREFIX}-blue)
         if [ -z "$EXISTING_BLUE" ]; then
@@ -90,6 +97,7 @@ jobs:
         docker pull ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
         docker run -d \
+          --network cleanup-net \
           --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
           -p ${NEW_PORT}:8080 \
           -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
@@ -101,6 +109,9 @@ jobs:
           -e DB_USER="${DB_USER}" \
           -e DB_PASSWORD="${DB_PASSWORD}" \
           -e DB_DATABASE="${DB_DATABASE}" \
+          -e REDIS_HOST="${REDIS_HOST}" \
+          -e REDIS_PORT="${REDIS_PORT}" \
+          -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
           -e JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS}" \
           ${{ env.IMAGE_NAME }}:${IMAGE_TAG}
 
