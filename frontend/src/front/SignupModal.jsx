@@ -1,23 +1,16 @@
-import React from 'react';
+import React from "react";
+import { apiBase } from "../api/http";   // ⬅️ 추가
 
-// 💡 수정 사항: openLoginModal 함수를 props로 받도록 추가했습니다.
 export default function SignupModal({ onClose, openLoginModal }) {
-  
-  // 소셜 회원가입/로그인 시도 핸들러
   const handleSocialSignup = (provider) => {
-    console.log(`${provider} 소셜 회원가입/로그인 시도`);
-    alert(`데모: ${provider} 인증 페이지로 이동합니다. (실제 서비스에서는 리다이렉트됩니다)`);
+    const p = provider.toLowerCase();
+    window.location.href = `${apiBase}/api/oauth/${p}/login`;
   };
 
-  // 💡 수정 사항: '로그인하기' 버튼 클릭 시 handleGoToLogin 함수 실행
   const handleGoToLogin = (e) => {
     e.preventDefault();
-    // 1. 현재 회원가입 모달을 닫고
-    onClose(); 
-    // 2. 로그인 모달을 열어주는 함수를 실행합니다.
-    if (openLoginModal) {
-        openLoginModal();
-    }
+    onClose();
+    if (openLoginModal) openLoginModal();
   };
     
   return (
