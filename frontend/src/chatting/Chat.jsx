@@ -9,7 +9,7 @@ export default function Chat() {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // CRA에서는 import.meta를 지원하지 않으므로 REACT_APP_*만 사용한다.
+    // 환경 변수에서 Socket URL을 가져옵니다.
     const url =
       (typeof process !== "undefined" && process.env?.REACT_APP_SOCKET_URL) ||
       (typeof process !== "undefined" && process.env?.REACT_APP_API_BASE) ||
@@ -22,7 +22,9 @@ export default function Chat() {
 
     socketRef.current = s;
     s.emit("join", { roomId });
-    // s.emit("room:join", roomId); // 서버가 room:join 사용 시
+    
+    // 💡 안 읽은 메시지 처리: 채팅방 진입 시 '읽음' 신호를 서버에 전송합니다.
+    s.emit("read_messages", { roomId }); 
 
     const onMsg = (m) => setLogs((prev) => [...prev, m]);
     s.on("msg", onMsg);
@@ -39,7 +41,6 @@ export default function Chat() {
     const payload = { roomId, text: msg, ts: Date.now() };
 
     socketRef.current.emit("msg", payload);
-    // socketRef.current.emit("chat:send", payload);
 
     setLogs((prev) => [...prev, { ...payload, from: "me" }]);
     setMsg("");
@@ -53,40 +54,38 @@ export default function Chat() {
   };
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>채팅방</h2>
+    <div className="chat-page-container fade-in">
+      <h2 className="chat-title">채팅방: {roomId}</h2>
 
-      <div
-        style={{
-          height: 360,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-          padding: 12,
-          overflowY: "auto",
-          marginBottom: 12,
-          background: "#fff",
-        }}
-      >
+      <div className="chat-log-box">
         {logs.map((m, i) => (
-          <div key={i} style={{ marginBottom: 8 }}>
-            <span style={{ color: "#999", marginRight: 8 }}>
-              {new Date(m.ts || Date.now()).toLocaleTimeString()}
+          <div 
+            key={i} 
+            // 'from' 필드를 사용하여 내 메시지/상대방 메시지 구분
+            className={`chat-message ${m.from === "me" ? "message-me" : "message-other"}`}
+          >
+            <span className="message-time">
+              {new Date(m.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
-            <span>{m.text ?? String(m)}</span>
+            <span className="message-bubble">{m.text ?? String(m)}</span>
+            {/* 💡 안 읽은 메시지 배지 (실제로는 서버 데이터에 의존해야 함) */}
+            {/* <span className="unread-badge">1</span> */}
           </div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="chat-input-area">
         <textarea
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
           onKeyDown={onKey}
-          rows={2}
-          style={{ flex: 1, resize: "vertical" }}
+          rows={3}
+          className="chat-textarea"
           placeholder="메시지 입력 후 Enter 전송 (줄바꿈: Shift+Enter)"
         />
-        <button onClick={send}>보내기</button>
+        <button className="chat-send-btn btn-submit" onClick={send}>
+          보내기
+        </button>
       </div>
     </div>
   );
