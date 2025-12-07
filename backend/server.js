@@ -558,7 +558,8 @@ io.on("connection", (socket) => {
       const hasNumericRoomId = !Number.isNaN(numericRoomId);
 
       let saved = null;
-
+      
+    console.log(`📤 broadcast: room=${roomKey}, msg="${text}" from ${userId || socket.id}`);
       // roomId가 숫자 + userId 있을 때만 DB에 저장
       if (userId && hasNumericRoomId) {
         try {
