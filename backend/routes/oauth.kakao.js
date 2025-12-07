@@ -14,11 +14,11 @@ function makeState() {
 router.get('/login', (req, res) => {
   const state = makeState();
 
+
   res.cookie('kakao_oauth_state', state, {
     httpOnly: true,
-    maxAge: 5 * 60 * 1000,
+    maxAge: 5 * 60 * 1000, // 5분
     sameSite: 'lax',
-    //secure: process.env.NODE_ENV === 'production',
   });
 
   const authURL = new URL('https://kauth.kakao.com/oauth/authorize');
@@ -51,6 +51,7 @@ router.get('/callback', async (req, res) => {
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+
     const accessToken = tokenRes.data.access_token;
 
     const meRes = await axios.get('https://kapi.kakao.com/v2/user/me', {
@@ -63,6 +64,8 @@ router.get('/callback', async (req, res) => {
 
     const nickname = profile.nickname || `kakao_${kakaoId}`;
 
+    const username = `kakao_${kakaoId}`;
+
     const emailFromProvider =
       acc.has_email && !acc.email_needs_agreement ? acc.email : null;
 
@@ -70,7 +73,7 @@ router.get('/callback', async (req, res) => {
     const profileJson = meRes.data;
 
     const findSql = `
-      SELECT u.user_id, u.email
+      SELECT u.user_id, u.email, u.username
       FROM user_providers up
       JOIN users u ON u.user_id = up.user_id
       WHERE up.provider = 'kakao' AND up.provider_user_id = $1
@@ -102,8 +105,9 @@ router.get('/callback', async (req, res) => {
         VALUES ($1, $2, 'USER', NOW())
         RETURNING user_id, email
         `,
-        [nickname, emailFromProvider]
+        [username, emailFromProvider]
       );
+
       userId = insUser.rows[0].user_id;
       userEmail = insUser.rows[0].email;
 
@@ -125,6 +129,7 @@ router.get('/callback', async (req, res) => {
       );
     }
 
+    // 4. JWT 발급
     const token = jwt.sign(
       { userId, email: userEmail, provider: 'kakao' },
       process.env.JWT_SECRET,
@@ -133,24 +138,32 @@ router.get('/callback', async (req, res) => {
 
     res.clearCookie('kakao_oauth_state');
 
-    /*/ 프론트 완료되면 삭제 할 코드(테스트 할려고 냅둠)
+    // (테스트용) JSON 으로 바로 응답
     return res.json({
       provider: 'kakao',
       token,
     });
-*/
-    // 프론트 완료되면 쓸 코드
-    
+
+    // === 실제 프론트 연동 시 사용할 코드 ===
+    /*
     const redirect = new URL(
       '/oauth/callback',
       process.env.FRONTEND_URL || 'http://localhost:5173'
     );
     redirect.hash = `provider=kakao&token=${encodeURIComponent(token)}`;
     return res.redirect(redirect.toString());
-    
+    */
   } catch (err) {
-    console.error('[kakao/callback]', err.response?.data || err);
-    res.status(500).json({ message: 'Kakao OAuth failed', error: err.message });
+    if (err.code === '23505') {
+      console.error('[kakao/callback] unique violation:', err.detail || err.message);
+    } else {
+      console.error('[kakao/callback]', err.response?.data || err);
+    }
+
+    res.status(500).json({
+      message: 'Kakao OAuth failed',
+      error: err.message,
+    });
   }
 });
 
