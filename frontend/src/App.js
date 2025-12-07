@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 // 레이아웃 및 컴포넌트 import
-import Layout from "./front/Layout"; // 이 안에 Header가 있다고 가정
+import Layout from "./front/layout"; // 이 안에 Header가 있다고 가정
 import SignupModal from "./front/SignupModal"; // 회원가입 모달
 import LoginModal from "./front/LoginModal";   // 로그인 모달
 
