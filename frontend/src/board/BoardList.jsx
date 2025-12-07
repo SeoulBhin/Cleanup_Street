@@ -22,15 +22,19 @@ export default function BoardList() {
   const fetchList = async () => {
     setLoading(true);
     try {
-      const list = await listBoardPosts(boardType, q);
-      setRows(list || []);
-    } catch {
-      setRows([]);
+        const list = await listBoardPosts(boardType, q);
+        
+        // 수정된 부분: list가 배열인지 확인하고, 아니면 빈 배열을 사용합니다.
+        const safeList = Array.isArray(list) ? list : []; 
+        setRows(safeList);
+        
+    } catch (error) {
+        console.error("게시글 목록 로딩 오류:", error);
+        setRows([]);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
-
+};
   useEffect(() => {
     fetchList();
     // eslint-disable-next-line
