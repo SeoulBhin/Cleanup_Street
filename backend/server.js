@@ -413,69 +413,108 @@ app.get("/tiles/:z/:x/:y.png", async (req, res) => {
 io.on("connection", (socket) => {
   console.log("✅ socket connected:", socket.id);
 
-  // 방 참여 (프론트: s.emit("join", { roomId, userId }) 또는 { roomId }만 보내도 동작)
+  // 방 입장
+  // 프론트: s.emit("join", { roomId, userId })
   socket.on("join", async ({ roomId, userId }) => {
     try {
       if (!roomId) return;
 
+      // 실제 소켓 방 이름은 문자열로 통일
+      const roomKey = String(roomId);
+      socket.join(roomKey);
+      console.log(`📌 socket ${socket.id} join room:`, roomKey);
+
+      // roomId가 숫자로 해석 가능한 경우에만 DB(room_members)에 기록
       const numericRoomId = Number(roomId);
-      if (Number.isNaN(numericRoomId)) {
-        console.warn("join: invalid roomId:", roomId);
-        return;
-      }
+      const hasNumericRoomId = !Number.isNaN(numericRoomId);
 
-      socket.join(String(roomId));
-
-      // userId가 있으면 방 멤버 테이블에 upsert
-      if (userId) {
+      if (userId && hasNumericRoomId) {
         try {
-          await db.query(CHAT_SQL.UPSERT_MEMBER, [numericRoomId, Number(userId)]);
+          await db.query(CHAT_SQL.UPSERT_MEMBER, [
+            numericRoomId,
+            Number(userId),
+          ]);
         } catch (err) {
           console.error("UPSERT_MEMBER error:", err);
         }
       }
 
-      // (선택) 최근 메시지 불러오기 → 필요하면 주석 해제
-      // const { rows } = await db.query(CHAT_SQL.LOAD_RECENT_MESSAGES, [numericRoomId, 50, 0]);
-      // socket.emit("msg:init", rows.map((r) => ({
-      //   id: r.message_id,
-      //   roomId: r.room_id,
-      //   userId: r.sender_id,
-      //   text: r.content,
-      //   ts: r.created_at,
-      //   from: r.sender_id,
-      // })));
+      // 필요하면 최근 메시지 불러오기 (프론트에서 msg:init 처리 필요)
+      /*
+      if (hasNumericRoomId) {
+        try {
+          const { rows } = await db.query(CHAT_SQL.LOAD_RECENT_MESSAGES, [
+            numericRoomId,
+            50, // limit
+            0,  // offset
+          ]);
+
+          socket.emit(
+            "msg:init",
+            rows.map((r) => ({
+              id: r.message_id,
+              roomId: r.room_id,
+              userId: r.sender_id,
+              text: r.content,
+              ts: r.created_at,
+              from: r.sender_id,
+            }))
+          );
+        } catch (err) {
+          console.error("LOAD_RECENT_MESSAGES error:", err);
+        }
+      }
+      */
     } catch (err) {
       console.error("join handler error:", err);
     }
   });
 
-  // 기존 room:join / room:leave도 유지 (필요하면 프론트에서 사용)
+  // 기존 room:join / room:leave (원하면 프론트에서 사용)
   socket.on("room:join", (roomId) => {
     if (!roomId) return;
-    socket.join(String(roomId));
+    const roomKey = String(roomId);
+    socket.join(roomKey);
+    console.log(`room:join → ${socket.id} joined ${roomKey}`);
   });
 
   socket.on("room:leave", (roomId) => {
     if (!roomId) return;
-    socket.leave(String(roomId));
+    const roomKey = String(roomId);
+    socket.leave(roomKey);
+    console.log(`room:leave → ${socket.id} left ${roomKey}`);
   });
 
-  // 메시지 브로드캐스트 + DB 저장
+  // 안 읽은 메시지 읽음 처리 (프론트에서 emit("read_messages", { roomId }) 사용 중)
+  socket.on("read_messages", async ({ roomId, userId }) => {
+    try {
+      if (!roomId) return;
+
+      const numericRoomId = Number(roomId);
+      const hasNumericRoomId = !Number.isNaN(numericRoomId);
+
+      // 아직 읽음 상태를 저장하는 테이블이 없다면, 일단 로그만 찍도록
+      console.log(
+        `👀 read_messages: roomId=${roomId}, userId=${userId || "anonymous"}`
+      );
+    } catch (err) {
+      console.error("read_messages error:", err);
+    }
+  });
+
+  // 공통 브로드캐스트 함수
   const broadcast = async ({ roomId, text, ts, userId }) => {
     try {
       if (!roomId || !text) return;
 
+      const roomKey = String(roomId); // 실제 소켓 방 이름
       const numericRoomId = Number(roomId);
-      if (Number.isNaN(numericRoomId)) {
-        console.warn("broadcast: invalid roomId:", roomId);
-        return;
-      }
+      const hasNumericRoomId = !Number.isNaN(numericRoomId);
 
       let saved = null;
 
-      // userId가 있으면 DB에 저장 (비로그인/익명은 저장 안 해도 됨)
-      if (userId) {
+      // roomId가 숫자 + userId 있을 때만 DB에 저장
+      if (userId && hasNumericRoomId) {
         try {
           const { rows } = await db.query(CHAT_SQL.INSERT_MESSAGE, [
             numericRoomId,
@@ -489,22 +528,35 @@ io.on("connection", (socket) => {
       }
 
       const payload = {
-        roomId: numericRoomId,
+        // 숫자로 되는 방은 number, 그 외는 문자열로 유지
+        roomId: hasNumericRoomId ? numericRoomId : roomKey,
         text,
-        ts: saved ? saved.created_at : (ts || Date.now()),
+        ts: saved ? saved.created_at : ts || Date.now(),
         userId,
-        from: userId || socket.id,
+        from: userId || socket.id, // 프론트에서는 from === "me"로 본인/상대 구분
       };
 
-      // 같은 방의 다른 클라이언트에게만 전송 (본인은 프론트에서 logs에 push)
-      socket.to(String(roomId)).emit("msg", payload);
+      // 같은 방의 "다른" 클라이언트에게만 전송
+      // (본인은 프론트에서 logs에 직접 push)
+      socket.to(roomKey).emit("msg", payload);
+      console.log(
+        `💬 broadcast to ${roomKey} from ${
+          userId || socket.id
+        }: ${text.substring(0, 50)}`
+      );
     } catch (err) {
       console.error("broadcast error:", err);
     }
   };
 
-  socket.on("msg",       broadcast);
+  // 프론트에서 emit("msg", payload) / emit("chat:send", payload) 둘 다 지원
+  socket.on("msg", broadcast);
   socket.on("chat:send", broadcast);
+
+  // 연결 종료
+  socket.on("disconnect", (reason) => {
+    console.log(`❌ socket disconnected: ${socket.id}, reason: ${reason}`);
+  });
 });
 
 // ========================= SPA Fallback / 404 / 에러 =========================
