@@ -13,7 +13,6 @@ const cookieParser = require("cookie-parser");
 const multer = require("multer");
 const { Server } = require("socket.io");
 const fetch = require("node-fetch");
-const { pingRedis } = require("./utils/redisClient");
 
 // PostgreSQL 래퍼
 const db = require("./db");
@@ -25,14 +24,8 @@ const ALLOW_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  //"http://watchout.com", // 배포 후 도메인 여기에 추가
+   "http://52.63.57.185", 
 ];
-const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
-const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
-const REDIS_URL = REDIS_PASSWORD
-  ? `redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`
-  : `redis://${REDIS_HOST}:${REDIS_PORT}`;
 
 // React 빌드 폴더 (frontend/build)
 const BUILD_DIR = path.join(__dirname, "..", "frontend", "build");
@@ -184,8 +177,7 @@ const kakaoOAuth           = require("./routes/oauth.kakao");
 
 const imagePreviewRoutes   = require("./routes/image-previews");
 const mosaicPostsRouter    = require("./routes/posts");   // /api/posts
-// 🔥 새로 추가해야 하는 라우터
-const boardPostsRouter   = require("./routes/board-posts");
+
 // ========================= 앱 / 서버 / 소켓 =========================
 
 const app = express();
@@ -196,34 +188,6 @@ const io = new Server(server, {
     credentials: true,
   },
 });
-// ===== Redis Adapter 설정 =====
-const { createAdapter } = require("@socket.io/redis-adapter");
-const { createClient } = require("redis");
-
-(async () => {
-  try {
-    const pubClient = createClient({ url: REDIS_URL });
-    const subClient = pubClient.duplicate();
-
-    pubClient.on("error", (err) =>
-      console.error("❌ Redis pubClient error:", err?.message || err)
-    );
-    subClient.on("error", (err) =>
-      console.error("❌ Redis subClient error:", err?.message || err)
-    );
-
-    await pubClient.connect();
-    await subClient.connect();
-
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log(
-      `🔗 Redis Adapter connected → ${REDIS_HOST}:${REDIS_PORT} (Socket.IO clustering 활성화)`
-    );
-  } catch (err) {
-    console.error("❌ Redis Adapter init failed:", err?.message || err);
-  }
-})();
-
 
 // ========================= 글로벌 미들웨어 =========================
 
@@ -249,25 +213,9 @@ app.use("/uploads", express.static(UPLOAD_DIR));   // 업로드 파일
 app.use("/gallery", express.static(GALLERY_DIR));  // 갤러리 원본 이미지
 app.use(express.static(BUILD_DIR));                // React build
 
-console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
-console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
 // 헬스 체크
-app.get("/health", async (_, res) => {
-  let redisStatus = "unknown";
+app.get("/health", (_, res) => res.json({ status: "UP" }));
 
-  try {
-    redisStatus = (await pingRedis()) ? "ok" : "down";
-  } catch (err) {
-    console.error("Redis health check failed:", err?.message || err);
-    redisStatus = "down";
-  }
-
-  res.json({ status: "UP", redis: redisStatus });
-});
-
-app.get("/api/hello", (req, res) => {
-  res.status(200).json({ message: "cleanup street backend alive" });
-});
 // ========================= 공지 / 갤러리 API =========================
 
 app.get("/api/announcements", (req, res) => {
@@ -325,14 +273,12 @@ app.use("/api/report",   reportRoutes);
 app.use("/api/recovery", recoveryRoutes);
 
 app.use("/api/image-previews", imagePreviewRoutes);
-// 🔥 게시판(board-posts) 라우터 추가
-app.use("/api/board-posts", boardPostsRouter);
 
 // ========================= 파일 업로드 =========================
 
 app.post(
   "/api/uploads",
-  // requireAuth,   // ⛔ 잠깐 주석 처리 (또는 삭제)
+  requireAuth,
   upload.array("files", 10),
   (req, res) => {
     const proto = req.headers["x-forwarded-proto"] || req.protocol;
@@ -426,7 +372,6 @@ app.get("/api/map", async (req, res) => {
   }
 });
 
-/*
 // ========================= OSM 타일 프록시 (/tiles/*) =========================
 
 app.get("/tiles/:z/:x/:y.png", async (req, res) => {
@@ -453,116 +398,75 @@ app.get("/tiles/:z/:x/:y.png", async (req, res) => {
     res.status(502).end();
   }
 });
-*/
 
 // ========================= Socket.IO (채팅) =========================
 
 io.on("connection", (socket) => {
   console.log("✅ socket connected:", socket.id);
 
-  // 방 입장
-  // 프론트: s.emit("join", { roomId, userId })
+  // 방 참여 (프론트: s.emit("join", { roomId, userId }) 또는 { roomId }만 보내도 동작)
   socket.on("join", async ({ roomId, userId }) => {
     try {
       if (!roomId) return;
 
-      // 실제 소켓 방 이름은 문자열로 통일
-      const roomKey = String(roomId);
-      socket.join(roomKey);
-      console.log(`📌 socket ${socket.id} join room:`, roomKey);
-
-      // roomId가 숫자로 해석 가능한 경우에만 DB(room_members)에 기록
       const numericRoomId = Number(roomId);
-      const hasNumericRoomId = !Number.isNaN(numericRoomId);
+      if (Number.isNaN(numericRoomId)) {
+        console.warn("join: invalid roomId:", roomId);
+        return;
+      }
 
-      if (userId && hasNumericRoomId) {
+      socket.join(String(roomId));
+
+      // userId가 있으면 방 멤버 테이블에 upsert
+      if (userId) {
         try {
-          await db.query(CHAT_SQL.UPSERT_MEMBER, [
-            numericRoomId,
-            Number(userId),
-          ]);
+          await db.query(CHAT_SQL.UPSERT_MEMBER, [numericRoomId, Number(userId)]);
         } catch (err) {
           console.error("UPSERT_MEMBER error:", err);
         }
       }
 
-      // 필요하면 최근 메시지 불러오기 (프론트에서 msg:init 처리 필요)
-      /*
-      if (hasNumericRoomId) {
-        try {
-          const { rows } = await db.query(CHAT_SQL.LOAD_RECENT_MESSAGES, [
-            numericRoomId,
-            50, // limit
-            0,  // offset
-          ]);
-
-          socket.emit(
-            "msg:init",
-            rows.map((r) => ({
-              id: r.message_id,
-              roomId: r.room_id,
-              userId: r.sender_id,
-              text: r.content,
-              ts: r.created_at,
-              from: r.sender_id,
-            }))
-          );
-        } catch (err) {
-          console.error("LOAD_RECENT_MESSAGES error:", err);
-        }
-      }
-      */
+      // (선택) 최근 메시지 불러오기 → 필요하면 주석 해제
+      // const { rows } = await db.query(CHAT_SQL.LOAD_RECENT_MESSAGES, [numericRoomId, 50, 0]);
+      // socket.emit("msg:init", rows.map((r) => ({
+      //   id: r.message_id,
+      //   roomId: r.room_id,
+      //   userId: r.sender_id,
+      //   text: r.content,
+      //   ts: r.created_at,
+      //   from: r.sender_id,
+      // })));
     } catch (err) {
       console.error("join handler error:", err);
     }
   });
 
-  // 기존 room:join / room:leave (원하면 프론트에서 사용)
+  // 기존 room:join / room:leave도 유지 (필요하면 프론트에서 사용)
   socket.on("room:join", (roomId) => {
     if (!roomId) return;
-    const roomKey = String(roomId);
-    socket.join(roomKey);
-    console.log(`room:join → ${socket.id} joined ${roomKey}`);
+    socket.join(String(roomId));
   });
 
   socket.on("room:leave", (roomId) => {
     if (!roomId) return;
-    const roomKey = String(roomId);
-    socket.leave(roomKey);
-    console.log(`room:leave → ${socket.id} left ${roomKey}`);
+    socket.leave(String(roomId));
   });
 
-  // 안 읽은 메시지 읽음 처리 (프론트에서 emit("read_messages", { roomId }) 사용 중)
-  socket.on("read_messages", async ({ roomId, userId }) => {
-    try {
-      if (!roomId) return;
-
-      const numericRoomId = Number(roomId);
-      const hasNumericRoomId = !Number.isNaN(numericRoomId);
-
-      // 아직 읽음 상태를 저장하는 테이블이 없다면, 일단 로그만 찍도록
-      console.log(
-        `👀 read_messages: roomId=${roomId}, userId=${userId || "anonymous"}`
-      );
-    } catch (err) {
-      console.error("read_messages error:", err);
-    }
-  });
-
-  // 공통 브로드캐스트 함수
+  // 메시지 브로드캐스트 + DB 저장
   const broadcast = async ({ roomId, text, ts, userId }) => {
     try {
       if (!roomId || !text) return;
 
-      const roomKey = String(roomId); // 실제 소켓 방 이름
       const numericRoomId = Number(roomId);
-      const hasNumericRoomId = !Number.isNaN(numericRoomId);
+      if (Number.isNaN(numericRoomId)) {
+        console.warn("broadcast: invalid roomId:", roomId);
+        return;
+      }
 
       let saved = null;
-      
-    console.log(`📤 broadcast: room=${roomKey}, msg="${text}" from ${userId || socket.id}`);
-      // roomId가 숫자 + userId 있을 때만 DB에 저장
-      if (userId && hasNumericRoomId) {
+
+      // userId가 있으면 DB에 저장 (비로그인/익명은 저장 안 해도 됨)
+      if (userId) {
         try {
           const { rows } = await db.query(CHAT_SQL.INSERT_MESSAGE, [
             numericRoomId,
@@ -576,35 +480,22 @@ io.on("connection", (socket) => {
       }
 
       const payload = {
-        // 숫자로 되는 방은 number, 그 외는 문자열로 유지
-        roomId: hasNumericRoomId ? numericRoomId : roomKey,
+        roomId: numericRoomId,
         text,
-        ts: saved ? saved.created_at : ts || Date.now(),
+        ts: saved ? saved.created_at : (ts || Date.now()),
         userId,
-        from: userId || socket.id, // 프론트에서는 from === "me"로 본인/상대 구분
+        from: userId || socket.id,
       };
 
-      // 같은 방의 "다른" 클라이언트에게만 전송
-      // (본인은 프론트에서 logs에 직접 push)
-      socket.to(roomKey).emit("msg", payload);
-      console.log(
-        `💬 broadcast to ${roomKey} from ${
-          userId || socket.id
-        }: ${text.substring(0, 50)}`
-      );
+      // 같은 방의 다른 클라이언트에게만 전송 (본인은 프론트에서 logs에 push)
+      socket.to(String(roomId)).emit("msg", payload);
     } catch (err) {
       console.error("broadcast error:", err);
     }
   };
 
-  // 프론트에서 emit("msg", payload) / emit("chat:send", payload) 둘 다 지원
-  socket.on("msg", broadcast);
+  socket.on("msg",       broadcast);
   socket.on("chat:send", broadcast);
-
-  // 연결 종료
-  socket.on("disconnect", (reason) => {
-    console.log(`❌ socket disconnected: ${socket.id}, reason: ${reason}`);
-  });
 });
 
 // ========================= SPA Fallback / 404 / 에러 =========================
