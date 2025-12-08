@@ -17,6 +17,7 @@ jobs:
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_DATABASE: ${{ secrets.DB_DATABASE }}
+      BACKEND_ENV_FILE: /home/ec2-user/backend.env
 
     steps:
     - name: Checkout code
@@ -76,6 +77,7 @@ jobs:
         REDIS_HOST=${REDIS_HOST:-cleanup-redis}
         REDIS_PORT=${REDIS_PORT:-6379}
         REDIS_PASSWORD=${REDIS_PASSWORD:-0000}
+        ENV_FILE=${BACKEND_ENV_FILE:-/home/ec2-user/backend.env}
 
         # Ensure shared network exists (Redis + app)
         docker network create cleanup-net || true
@@ -100,6 +102,7 @@ jobs:
           --network cleanup-net \
           --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
           -p ${NEW_PORT}:8080 \
+          --env-file "${ENV_FILE}" \
           -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
           -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
           -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
