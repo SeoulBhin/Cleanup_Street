@@ -7,13 +7,14 @@ async function geocodeNaver(address) {
   if (!address) return null;
 
   const url =
-    "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=" +
-    encodeURIComponent(address);
+  "https://maps.apigw.ntruss.com/map-geocode/v2/geocode?query=" +
+  encodeURIComponent(address);
 
   const res = await fetch(url, {
     headers: {
       "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
       "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
+      "Accept": "application/json",
     },
   });
 
