@@ -211,7 +211,13 @@ router.post('/', async (req, res) => {
     });
   } catch (err) {
     console.error("Error during image preview creation:", err);
-    res.status(500).json({ error: "Failed to process image" });
+    // Fallback: 원본 URL을 그대로 두 버전 모두로 반환 (모자이크 엔진 실패 시에도 진행)
+    res.status(200).json({
+      previewId,
+      autoMosaicImage: imageUrl,
+      plateVisibleImage: imageUrl,
+      warning: "Mosaic processing failed; returned original image as preview.",
+    });
   } finally {
     // Clean up the temporary file
     if (tempFileSaved) {
