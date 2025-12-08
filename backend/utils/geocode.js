@@ -35,7 +35,8 @@ async function geocodeNaver(address) {
   // H3 인덱스 계산 (예외 보호)
   let h3Index = null;
   try {
-    h3Index = h3.geoToH3(lat, lng, 8);
+    // 🔥 geoToH3 ➜ latLngToCell 로 변경
+    h3Index = h3.latLngToCell(lat, lng, 8);
   } catch (err) {
     console.error("[GEOCODE] H3 변환 실패:", err);
     h3Index = null;
