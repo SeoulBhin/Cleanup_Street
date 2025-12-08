@@ -11,7 +11,6 @@ export default function PostView() {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  const [viewVariant, setViewVariant] = useState("AUTO"); // AUTO or PLATE_VISIBLE
   const [selectedImageId, setSelectedImageId] = useState(null);
 
   // 🔹 id가 정상적인 숫자인지 체크
@@ -37,7 +36,6 @@ export default function PostView() {
         setLoadError(null);
         const p = await getBoardPost(boardType, id);
         setPost(p);
-        setViewVariant("AUTO");
         setSelectedImageId(null);
       } catch (err) {
         console.error("게시글 불러오기 실패:", err);
@@ -159,11 +157,6 @@ export default function PostView() {
     variant: (img.variant || "").toUpperCase(),
   }));
 
-  const variantImage = (variant) =>
-    normalizedImages.find((img) => img.variant === variant);
-
-  const hasAuto = !!variantImage("AUTO");
-  const hasPlateVisible = !!variantImage("PLATE_VISIBLE");
   const hasProcessed = normalizedImages.length > 0;
 
   // attachments + content 내 이미지 URL도 썸네일로 포함 (중복 제거)
@@ -191,22 +184,8 @@ export default function PostView() {
       return img.imageId === selectedImageId;
     }) || null;
 
-  const defaultImage =
-    (hasProcessed && (variantImage(viewVariant) || normalizedImages[0])) ||
-    gallerySources[0] ||
-    null;
-
+  const defaultImage = gallerySources[0] || null;
   const activeImage = selected || defaultImage;
-
-  const toggleVariant = () => {
-    if (viewVariant === "AUTO" && hasPlateVisible) {
-      setViewVariant("PLATE_VISIBLE");
-      setSelectedImageId(variantImage("PLATE_VISIBLE")?.imageId ?? null);
-    } else {
-      setViewVariant("AUTO");
-      setSelectedImageId(variantImage("AUTO")?.imageId ?? null);
-    }
-  };
 
   // --------------------------
   // 렌더링
@@ -262,29 +241,6 @@ export default function PostView() {
               처리 중 (원본 미리보기)
             </span>
           )}
-          {hasProcessed && (
-            <span
-              style={{
-                fontSize: 12,
-                padding: "2px 8px",
-                borderRadius: 12,
-                background: "#0ea5e9",
-                color: "#fff",
-              }}
-            >
-              {viewVariant === "AUTO"
-                ? "얼굴+번호판 모자이크"
-                : "번호판만 모자이크 해제"}
-            </span>
-          )}
-          <button
-            className="form-btn btn-submit"
-            style={{ padding: "6px 12px" }}
-            onClick={toggleVariant}
-            disabled={!hasProcessed || (!hasAuto && !hasPlateVisible)}
-          >
-            {viewVariant === "AUTO" ? "번호판 모자이크 해제" : "전체 모자이크"}
-          </button>
         </div>
 
         {activeImage ? (
