@@ -89,8 +89,6 @@ async function geocodeNaver(address) {
   }
 }
 
-console.log("[POSTS] final coords:", { lat, lng, h3Idx, address });
-
 // ================== 목록 / 상세 ==================
 
 // GET posts list
@@ -297,6 +295,8 @@ router.put("/:postId", async (req, res) => {
     if (lat !== null && lat !== undefined) lat = Number(lat);
     if (lng !== null && lng !== undefined) lng = Number(lng);
 
+    console.log("[POSTS] final coords:", { lat, lng, h3Idx, address });
+    
     const location =
       lat && lng ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
@@ -325,6 +325,7 @@ router.put("/:postId", async (req, res) => {
       lat,
       lng,
     ];
+    
 
     const { rows } = await db.query(updateQuery, updateValues);
     if (!rows.length) {
