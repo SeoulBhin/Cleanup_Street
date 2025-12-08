@@ -65,9 +65,10 @@ async function geocodeNaver(address) {
     });
 
     if (!res.ok) {
-      console.error("[GEOCODE] naver status:", res.status);
-      return null;
-    }
+  const text = await res.text().catch(() => "");
+  console.error("[GEOCODE] naver status:", res.status, text);
+  return null;
+}
 
     const data = await res.json();
     if (!data.addresses || data.addresses.length === 0) return null;
