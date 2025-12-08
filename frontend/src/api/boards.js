@@ -18,7 +18,7 @@ export function getBoardPost(boardType, id) {
 export function createBoardPost(boardType, body) {
   return postJSON(`/api/posts`, {
     ...body,                             // 🔥 postBody 포함해서 전부 전달
-    category: boardType || body.category,
+    category: body.category,
   });
 }
 
