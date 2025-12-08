@@ -257,7 +257,7 @@ export default function PostView() {
             >
               <img
                 src={activeImage.imageUrl}
-                alt={activeImage.variant || "image"}
+                alt="게시 이미지"
                 style={{
                   width: "100%",
                   minHeight: 320,
@@ -312,7 +312,7 @@ export default function PostView() {
               >
                 <img
                   src={img.imageUrl}
-                  alt={img.variant || "thumbnail"}
+                  alt="이미지 썸네일"
                   style={{ width: 120, height: 80, objectFit: "cover", display: "block", borderRadius: 7 }}
                   loading="lazy"
                 />
