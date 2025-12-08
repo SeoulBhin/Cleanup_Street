@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");              // pg 래퍼 (db.query)
 const fetch = require("node-fetch");
-const h3 = require("h3-js");
+const { geoToH3 } = require("h3-js");
 
 // ================== 공통 SELECT ==================
 const BASE_SELECT = `
