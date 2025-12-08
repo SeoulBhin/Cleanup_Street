@@ -197,7 +197,12 @@ export default function RightMap() {
             p.lng ?? p.longitude ?? p.Longitude ?? p.LNG ?? p.x
           );
           const thumbnail =
-            p.image_url || p.imageUrl || p.image || p.thumbnail || null;
+            p.image_url ||
+            p.imageUrl ||
+            p.image ||
+            p.thumbnail ||
+            (Array.isArray(p.images) && p.images[0]?.imageUrl) ||
+            null;
           const imageVariant = p.image_variant || p.imageVariant || "";
           const contentSnippet =
             (p.content && String(p.content).slice(0, 120)) || "";
