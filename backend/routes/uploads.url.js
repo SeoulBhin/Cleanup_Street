@@ -26,6 +26,12 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "sourceUrl is required" });
     }
 
+    if (!/^https?:\/\//i.test(sourceUrl)) {
+      return res
+        .status(400)
+        .json({ message: "sourceUrl must start with http or https" });
+    }
+
     // 기본 확장자 추정
     const lower = sourceUrl.toLowerCase();
     let ext = ".jpg";
@@ -38,11 +44,21 @@ router.post("/", async (req, res) => {
     const filename = `${crypto.randomBytes(8).toString("hex")}${ext}`;
     const dest = path.join(UPLOAD_DIR, filename);
 
-    const resp = await fetch(sourceUrl);
+    const resp = await fetch(sourceUrl, {
+      headers: { "User-Agent": "cleanup-street-fetch/1.0" },
+    });
     if (!resp.ok) {
-      return res
-        .status(502)
-        .json({ message: "Failed to fetch sourceUrl", status: resp.status });
+      console.error(
+        "[uploads:url] fetch failed",
+        sourceUrl,
+        resp.status,
+        resp.statusText
+      );
+      return res.status(502).json({
+        message: "Failed to fetch sourceUrl",
+        status: resp.status,
+        statusText: resp.statusText,
+      });
     }
 
     const arrayBuf = await resp.arrayBuffer();
@@ -52,7 +68,10 @@ router.post("/", async (req, res) => {
     res.json({ urls: [url] });
   } catch (err) {
     console.error("[uploads:url] error:", err);
-    res.status(500).json({ message: "Failed to download and save image" });
+    res.status(500).json({
+      message: "Failed to download and save image",
+      error: err?.message || String(err),
+    });
   }
 });
 
