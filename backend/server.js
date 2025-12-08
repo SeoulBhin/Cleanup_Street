@@ -250,6 +250,7 @@ app.use("/gallery", express.static(GALLERY_DIR));  // 갤러리 원본 이미지
 app.use(express.static(BUILD_DIR));                // React build
 
 console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
+console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
 // 헬스 체크
 app.get("/health", async (_, res) => {
   let redisStatus = "unknown";
