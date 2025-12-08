@@ -24,6 +24,7 @@ export default function PostForm() {
   });
   const [preview, setPreview] = useState(null); // { previewId, autoUrl, plateUrl, selectedVariant }
   const [uploading, setUploading] = useState(false);
+  const [processingText, setProcessingText] = useState("");
 
   // ================= 주소 검색 (카카오 우편번호) =================
   const openAddressSearch = () => {
@@ -76,6 +77,7 @@ export default function PostForm() {
     if (!files || files.length === 0) return;
     try {
       setUploading(true);
+      setProcessingText("이미지 처리 중입니다. 잠시만 기다려주세요...");
       const { urls } = await uploadFiles(files);
       setForm((s) => ({
         ...s,
@@ -93,14 +95,20 @@ export default function PostForm() {
             plateUrl: p.plateVisibleImage,
             selectedVariant: "AUTO",
           });
+          setProcessingText("");
         } catch (err) {
           console.error("미리보기 생성 실패", err);
+          setProcessingText("미리보기 생성에 실패했습니다. 그래도 원본을 사용해 저장할 수 있습니다.");
         }
       }
     } catch {
       alert("파일 업로드 중 오류가 발생했습니다.");
     } finally {
       setUploading(false);
+      if (!preview) {
+        // preview가 아직 없으면 처리중 메시지 유지
+        setProcessingText((t) => t || "");
+      }
     }
   };
 
@@ -224,20 +232,14 @@ export default function PostForm() {
               업로드 중...
             </div>
           )}
+          {!!processingText && (
+            <div style={{ marginTop: 6, fontSize: 14, color: "#6b7280" }}>
+              {processingText}
+            </div>
+          )}
           {!!(form.attachments || []).length && (
-            <div
-              style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}
-            >
-              첨부됨:
-              <ul>
-                {form.attachments.map((u, idx) => (
-                  <li key={idx}>
-                    <a href={u} target="_blank" rel="noreferrer">
-                      {u}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+            <div style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}>
+              첨부 이미지: {form.attachments.length}개
             </div>
           )}
         </div>
@@ -264,18 +266,29 @@ export default function PostForm() {
                     preview.selectedVariant === "AUTO"
                       ? "2px solid #0ea5e9"
                       : "1px solid #e5e7eb",
-                  borderRadius: 8,
+                  borderRadius: 12,
                   padding: 0,
                   background: "transparent",
                   cursor: "pointer",
+                  width: "100%",
+                  maxWidth: 520,
                 }}
               >
                 <img
                   src={preview.autoUrl}
                   alt="얼굴+번호판 모자이크"
-                  style={{ width: 220, height: 150, objectFit: "cover", display: "block", borderRadius: 7 }}
+                  style={{
+                    width: "100%",
+                    height: 280,
+                    objectFit: "contain",
+                    display: "block",
+                    borderRadius: 10,
+                    background: "#0f172a",
+                  }}
                 />
-                <div style={{ padding: 6, fontSize: 13 }}>얼굴+번호판 모자이크</div>
+                <div style={{ padding: 10, fontSize: 13, textAlign: "center" }}>
+                  얼굴+번호판 모자이크
+                </div>
               </button>
 
               <button
@@ -288,18 +301,29 @@ export default function PostForm() {
                     preview.selectedVariant === "PLATE_VISIBLE"
                       ? "2px solid #0ea5e9"
                       : "1px solid #e5e7eb",
-                  borderRadius: 8,
+                  borderRadius: 12,
                   padding: 0,
                   background: "transparent",
                   cursor: "pointer",
+                  width: "100%",
+                  maxWidth: 520,
                 }}
               >
                 <img
                   src={preview.plateUrl}
                   alt="얼굴만 모자이크"
-                  style={{ width: 220, height: 150, objectFit: "cover", display: "block", borderRadius: 7 }}
+                  style={{
+                    width: "100%",
+                    height: 280,
+                    objectFit: "contain",
+                    display: "block",
+                    borderRadius: 10,
+                    background: "#0f172a",
+                  }}
                 />
-                <div style={{ padding: 6, fontSize: 13 }}>얼굴만 모자이크</div>
+                <div style={{ padding: 10, fontSize: 13, textAlign: "center" }}>
+                  얼굴만 모자이크
+                </div>
               </button>
             </div>
             <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
