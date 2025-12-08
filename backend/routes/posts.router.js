@@ -13,7 +13,7 @@ const BASE_SELECT = `
     p.category,
     p.status,
     p.comment_count,
-    p.h3_index,
+    p.h3_index::text AS h3_index,
     p.created_at,
     p.updated_at,
     ST_AsText(p.location) AS location_wkt,
