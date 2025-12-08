@@ -145,6 +145,8 @@ jobs:
             -e KAKAO_CLIENT_SECRET="${KAKAO_CLIENT_SECRET}" \
             -e KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI}" \
             -e FRONTEND_URL="${FRONTEND_URL}" \
+            -e NAVER_CLIENT_ID_Map="${NAVER_CLIENT_ID_Map}" \
+            -e NAVER_CLIENT_SECRET_Map="${NAVER_CLIENT_SECRET_Map}" \
             ${BE_IMAGE}:${IMAGE_TAG}
 
           # Frontend
