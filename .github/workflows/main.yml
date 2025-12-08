@@ -68,6 +68,7 @@ jobs:
           REDIS_HOST: cleanup-redis
           REDIS_PORT: 6379
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          BYPASS_AUTH: "true"
         run: |
           echo "🚀 Starting Blue/Green Deployment for tag: ${IMAGE_TAG}"
 
@@ -118,6 +119,7 @@ jobs:
             -e REDIS_HOST="${REDIS_HOST}" \
             -e REDIS_PORT="${REDIS_PORT}" \
             -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
+            -e BYPASS_AUTH="${BYPASS_AUTH}" \
             -e KAKAO_REST_API_KEY_Value="${{ secrets.KAKAO_REST_API_KEY_Value }}" \
             ${BE_IMAGE}:${IMAGE_TAG}
 
