@@ -292,8 +292,8 @@ export default function PostView() {
             <div
               style={{
                 width: "100%",
-                maxWidth: 600,
-                borderRadius: 12,
+                maxWidth: 960,
+                borderRadius: 16,
                 overflow: "hidden",
                 border: "1px solid #e5e7eb",
                 background: "#0f172a",
@@ -302,7 +302,18 @@ export default function PostView() {
               <img
                 src={activeImage.imageUrl}
                 alt={activeImage.variant || "image"}
-                style={{ width: "100%", display: "block" }}
+                style={{
+                  width: "100%",
+                  minHeight: 320,
+                  maxHeight: 640,
+                  objectFit: "contain",
+                  display: "block",
+                  background: "#0f172a",
+                }}
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23232a3b'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%237884ab' font-size='20'%3E이미지를 불러올 수 없습니다%3C/text%3E%3C/svg%3E";
+                }}
               />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
@@ -354,21 +365,7 @@ export default function PostView() {
         )}
       </div>
 
-      {/* 🔹 기존 attachments 표시 (링크) */}
-      {!!attachments.length && (
-        <div style={{ marginTop: 12 }}>
-          <strong>첨부파일</strong>
-          <ul>
-            {attachments.map((u, idx) => (
-              <li key={idx}>
-                <a href={u} target="_blank" rel="noreferrer">
-                  {u}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* 🔹 기존 attachments 링크 표시는 숨김 (이미지 갤러리로만 노출) */}
 
       {/* 하단 버튼 */}
       <div className="form-actions" style={{ marginTop: 24 }}>
