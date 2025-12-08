@@ -1,3 +1,4 @@
+// src/components/PostForm.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -55,6 +56,31 @@ export default function PostForm() {
     }
   };
 
+  // ✅ 카카오 주소 검색 팝업 열기
+  const openAddressSearch = () => {
+    if (!window.daum || !window.daum.Postcode) {
+      alert("주소 검색 모듈이 아직 로드되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    new window.daum.Postcode({
+      oncomplete: function (data) {
+        // 도로명 주소(roadAddress) 우선, 없으면 지번 주소(jibunAddress)
+        const roadAddr = data.roadAddress;
+        const jibunAddr = data.jibunAddress;
+        const fullAddress = roadAddr || jibunAddr;
+
+        if (!fullAddress) return;
+
+        setForm((s) => ({
+          ...s,
+          address: fullAddress,
+        }));
+      },
+      // 필요하면 여기서 theme, width/height 등 옵션 추가 가능
+    }).open();
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!form.title.trim() || !form.content.trim()) {
@@ -64,8 +90,7 @@ export default function PostForm() {
 
     const payload = {
       title: form.title,
-      postBody: form.content,
-      // author: "로그인한유저", // 실제로는 서버에서 req.user 로 처리
+      postBody: form.content, // ✅ 백엔드에서 요구하는 필드명
       category: form.category,
       attachments: form.attachments || [],
       address: form.address?.trim() || null,
@@ -96,6 +121,7 @@ export default function PostForm() {
     <div className="page-container form-container fade-in">
       <h2 className="page-title">{isEdit ? "글 수정" : "새 글 작성"}</h2>
       <form className="form" onSubmit={onSubmit}>
+        {/* 제목 */}
         <div className="form-group">
           <label>제목</label>
           <input
@@ -108,6 +134,7 @@ export default function PostForm() {
           />
         </div>
 
+        {/* 카테고리 */}
         <div className="form-group">
           <label>카테고리</label>
           <select
@@ -124,17 +151,45 @@ export default function PostForm() {
           </select>
         </div>
 
+        {/* ✅ 주소 (검색 버튼 포함) */}
         <div className="form-group">
           <label>주소</label>
-          <input
-            className="form-input"
-            name="address"
-            value={form.address}
-            onChange={onChange}
-            placeholder="예) 서울특별시 중구 세종대로 110"
-          />
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              alignItems: "center",
+            }}
+          >
+            <input
+              className="form-input"
+              style={{ flex: 1 }}
+              name="address"
+              value={form.address}
+              readOnly // 👈 정확한 주소만 쓰게 하려면 readOnly 유지
+              placeholder="주소 검색 버튼을 눌러 선택하세요"
+            />
+            <button
+              type="button"
+              className="form-btn btn-secondary"
+              style={{ flexShrink: 0, whiteSpace: "nowrap" }}
+              onClick={openAddressSearch}
+            >
+              주소 검색
+            </button>
+          </div>
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 12,
+              color: "#6b7280",
+            }}
+          >
+            검색 버튼을 눌러 도로명 또는 지번 주소를 선택해주세요.
+          </div>
         </div>
 
+        {/* 첨부파일 */}
         <div className="form-group">
           <label>첨부파일</label>
           <input type="file" onChange={onUpload} />
@@ -154,6 +209,7 @@ export default function PostForm() {
           )}
         </div>
 
+        {/* 내용 */}
         <div className="form-group">
           <label>내용</label>
           <textarea
@@ -165,6 +221,7 @@ export default function PostForm() {
           />
         </div>
 
+        {/* 버튼들 */}
         <div className="form-actions">
           <button
             type="button"
