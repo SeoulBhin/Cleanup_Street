@@ -79,6 +79,15 @@ jobs:
         REDIS_PASSWORD=${REDIS_PASSWORD:-0000}
         ENV_FILE=${BACKEND_ENV_FILE:-/home/ec2-user/backend.env}
 
+        # Ensure env file exists and load it to export variables explicitly
+        if [ ! -f "${ENV_FILE}" ]; then
+          echo "❌ Env file not found at ${ENV_FILE}"
+          exit 1
+        fi
+        set -a
+        . "${ENV_FILE}"
+        set +a
+
         # Ensure shared network exists (Redis + app)
         docker network create cleanup-net || true
 
@@ -103,6 +112,19 @@ jobs:
           --name ${{ env.CONTAINER_PREFIX }}-${NEW_COLOR} \
           -p ${NEW_PORT}:8080 \
           --env-file "${ENV_FILE}" \
+          -e JWT_SECRET="${JWT_SECRET}" \
+          -e JWT_EXPIRES="${JWT_EXPIRES}" \
+          -e NODE_ENV="${NODE_ENV}" \
+          -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}" \
+          -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}" \
+          -e GOOGLE_REDIRECT_URI="${GOOGLE_REDIRECT_URI}" \
+          -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID}" \
+          -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET}" \
+          -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
+          -e KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID}" \
+          -e KAKAO_CLIENT_SECRET="${KAKAO_CLIENT_SECRET}" \
+          -e KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI}" \
+          -e FRONTEND_URL="${FRONTEND_URL}" \
           -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
           -e SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
           -e SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME}" \
