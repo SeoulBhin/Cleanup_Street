@@ -47,7 +47,6 @@ async function fetchPostById(postId) {
   return rows[0] || null;
 }
 
-// ================== 주소 → 좌표 (네이버 지오코딩) ==================
 
 async function geocodeNaver(address) {
   if (!address || !address.trim()) return null;
@@ -59,16 +58,16 @@ async function geocodeNaver(address) {
   try {
     const res = await fetch(url, {
       headers: {
-        // 문서에 나온 그대로 맞추기
+        "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
+        "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
         "Accept": "application/json",
-        "x-ncp-apigw-api-key-id": process.env.NAVER_CLIENT_ID_Map,
-        "x-ncp-apigw-api-key": process.env.NAVER_CLIENT_SECRET_Map,
       },
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      console.error("[GEOCODE] naver status:", res.status, text);
+      console.error("[GEOCODE] naver status:", res.status);
+      const text = await res.text().catch(() => "");
+      console.error("[GEOCODE] naver body:", text);
       return null;
     }
 
@@ -78,7 +77,6 @@ async function geocodeNaver(address) {
     const a = data.addresses[0];
     const lat = Number(a.y);
     const lng = Number(a.x);
-
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
     return {
@@ -91,6 +89,7 @@ async function geocodeNaver(address) {
     return null;
   }
 }
+
 // ================== 목록 / 상세 ==================
 
 // GET posts list
