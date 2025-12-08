@@ -332,6 +332,12 @@ app.use("/api/board-posts", boardPostsRouter);
 
 // ========================= 파일 업로드 =========================
 
+// 업로드 경로 접근 확인용
+app.get("/api/uploads/health", (_req, res) => {
+  res.json({ ok: true, message: "uploads alive" });
+});
+
+app.options("/api/uploads", cors()); // 명시적 preflight 허용
 app.post(
   "/api/uploads",
   // requireAuth,   // ⛔ 잠깐 주석 처리 (또는 삭제)
@@ -343,6 +349,11 @@ app.post(
     const urls = (req.files || []).map(
       (f) => `${base}/uploads/${path.basename(f.path)}`
     );
+    if (!urls.length) {
+      console.warn("[/api/uploads] no files received");
+    } else {
+      console.log("[/api/uploads] stored:", urls);
+    }
     res.json({ urls });
   }
 );
