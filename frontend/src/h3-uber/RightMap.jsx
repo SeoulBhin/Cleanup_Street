@@ -196,6 +196,9 @@ export default function RightMap() {
           const lng = Number(
             p.lng ?? p.longitude ?? p.Longitude ?? p.LNG ?? p.x
           );
+          const thumbnail =
+            p.image_url || p.imageUrl || p.image || p.thumbnail || null;
+          const imageVariant = p.image_variant || p.imageVariant || "";
 
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             console.warn("좌표가 이상해서 스킵:", p);
@@ -235,6 +238,34 @@ export default function RightMap() {
                   <strong>{p.title || "제목 없음"}</strong>
                   <br />
                   위도: {lat.toFixed(5)}, 경도: {lng.toFixed(5)}
+                  {thumbnail && (
+                    <div style={{ marginTop: 8 }}>
+                      <img
+                        src={thumbnail}
+                        alt={p.title || "post image"}
+                        style={{
+                          width: 180,
+                          height: 120,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          display: "block",
+                          border: "1px solid #e5e7eb",
+                        }}
+                        loading="lazy"
+                      />
+                      {imageVariant ? (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "#6b7280",
+                            marginTop: 4,
+                          }}
+                        >
+                          {imageVariant}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </Popup>
               </Marker>
             </React.Fragment>

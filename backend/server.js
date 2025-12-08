@@ -401,15 +401,32 @@ app.get("/api/map", async (req, res) => {
   try {
     const { rows } = await db.query(`
       SELECT
-        post_id AS id,
-        title,
-        latitude  AS lat,
-        longitude AS lng,
-        h3_index::text AS h3_cell
-      FROM posts
-      WHERE latitude  IS NOT NULL
-        AND longitude IS NOT NULL
-      ORDER BY created_at DESC
+        p.post_id AS id,
+        p.title,
+        p.latitude  AS lat,
+        p.longitude AS lng,
+        p.h3_index::text AS h3_cell,
+        img.image_url    AS image_url,
+        img.variant      AS image_variant
+      FROM posts p
+      LEFT JOIN LATERAL (
+        SELECT
+          pi.image_url,
+          pi.variant
+        FROM post_images pi
+        WHERE pi.post_id = p.post_id
+        ORDER BY
+          CASE
+            WHEN pi.variant = 'AUTO' THEN 1
+            WHEN pi.variant = 'PLATE_VISIBLE' THEN 2
+            ELSE 3
+          END,
+          pi.image_id
+        LIMIT 1
+      ) img ON TRUE
+      WHERE p.latitude  IS NOT NULL
+        AND p.longitude IS NOT NULL
+      ORDER BY p.created_at DESC
       LIMIT 500
     `);
 
