@@ -84,9 +84,19 @@ async function resolveLocation({ latitude, longitude, address }) {
     return { lat, lng, address: normalizedAddress };
   }
 
+ // 🔥 여기부터가 수정 포인트
   // 2) 좌표는 없고 address 텍스트만 존재하는 경우 → 카카오 지오코딩
   if (normalizedAddress) {
-    const geo = await geocodeAddress(normalizedAddress);
+    // ✅ 2-1. 주소 문자열 정리
+    // - 앞쪽 5자리 우편번호 제거
+    // - 괄호로 들어가는 동 정보 "(침산동)" 같은 것 제거
+    const cleaned = normalizedAddress
+      .replace(/^\d{5}\s*/, "")  // "41590 " 제거
+      .replace(/\(.*$/, "")      // "(침산동)" 이런 거 제거
+      .trim();
+
+    // ✅ 2-2. 정리된 주소로 지오코딩
+    const geo = await geocodeAddress(cleaned);
     if (!geo) {
       return {
         error: {
@@ -98,10 +108,11 @@ async function resolveLocation({ latitude, longitude, address }) {
         },
       };
     }
+
     return {
       lat: geo.lat,
       lng: geo.lng,
-      address: geo.normalizedAddress,
+      address: geo.normalizedAddress || cleaned,  // 정리된 주소 저장
     };
   }
 
