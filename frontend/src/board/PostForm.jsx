@@ -19,7 +19,7 @@ export default function PostForm() {
     title: "",
     category: FORUM_CATEGORIES[0],
     content: "",
-    attachments: [],
+    attachments: [], // 실제 저장용으로 보내지 않음(프라이버시), 프리뷰 생성만 사용
     address: "", // ✅ 주소 필드
   });
   const [preview, setPreview] = useState(null); // { previewId, autoUrl, plateUrl, selectedVariant }
@@ -81,7 +81,8 @@ export default function PostForm() {
       const { urls } = await uploadFiles(files);
       setForm((s) => ({
         ...s,
-        attachments: [...(s.attachments || []), ...urls],
+        // 첫 번째 업로드만 사용, 원본 저장은 하지 않음
+        attachments: urls.length ? [urls[0]] : [],
       }));
 
       // 첫 번째 업로드 파일로 모자이크 미리보기 생성
@@ -124,7 +125,7 @@ export default function PostForm() {
     const base = {
       title: form.title,
       category: form.category, // 실제 DB category (예: 도로-교통)
-      attachments: form.attachments || [],
+      attachments: [], // 원본은 저장하지 않음 (모자이크만 저장)
       address: form.address?.trim() || null,
       previewId: preview?.previewId || null,
       selectedVariant: preview?.selectedVariant || "AUTO",
@@ -239,7 +240,7 @@ export default function PostForm() {
           )}
           {!!(form.attachments || []).length && (
             <div style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}>
-              첨부 완료 (모자이크 미리보기 자동 생성)
+              첨부 완료 · 모자이크 미리보기 생성됨
             </div>
           )}
         </div>

@@ -273,8 +273,9 @@ export default function PostView() {
               />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
-              {activeImage.variant}
-              {activeImage.createdAt ? ` · ${new Date(activeImage.createdAt).toLocaleString()}` : ""}
+              {activeImage.createdAt
+                ? new Date(activeImage.createdAt).toLocaleString()
+                : ""}
             </div>
           </div>
         ) : (

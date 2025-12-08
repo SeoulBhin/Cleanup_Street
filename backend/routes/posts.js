@@ -137,7 +137,6 @@ router.post("/", async (req, res) => {
     h3Index,
     previewId,
     address, // 🔥 프론트에서 온 도로명 주소(카카오/네이버 검색 값)
-    attachments = [], // 원본/추가 이미지 URL 배열
   } = req.body;
 
   if (!title || !postBody || !category) {
@@ -246,21 +245,7 @@ router.post("/", async (req, res) => {
       );
     }
 
-    // 5-1) 추가 첨부(원본)도 post_images에 저장
-    if (Array.isArray(attachments) && attachments.length > 0) {
-      const params = [newPostId];
-      const values = attachments.map((url, idx) => {
-        params.push(url);
-        return `($1, $${idx + 2}, 'ORIGINAL')`;
-      });
-      await db.query(
-        `
-        INSERT INTO post_images (post_id, image_url, variant)
-        VALUES ${values.join(",")}
-        `,
-        params
-      );
-    }
+    // 원본 첨부는 저장하지 않음 (프라이버시)
 
     // 6) 방금 저장한 게시글 다시 조회해서 반환
     const createdPost = await fetchPostById(newPostId);
@@ -285,7 +270,6 @@ router.put("/:postId", async (req, res) => {
     h3Index,
     previewId,     // 수정하면서 새 미리보기 선택했을 때만 들어옴
     address,       // 수정 시에도 주소 문자열
-    attachments = [],
   } = req.body;
 
   if (!title || !postBody || !category) {
@@ -382,21 +366,7 @@ router.put("/:postId", async (req, res) => {
       }
     }
 
-    // 첨부 배열이 오면 ORIGINAL로 추가 저장 (덮어쓰지 않고 append)
-    if (Array.isArray(attachments) && attachments.length > 0) {
-      const params = [postId];
-      const values = attachments.map((url, idx) => {
-        params.push(url);
-        return `($1, $${idx + 2}, 'ORIGINAL')`;
-      });
-      await db.query(
-        `
-        INSERT INTO post_images (post_id, image_url, variant)
-        VALUES ${values.join(",")}
-        `,
-        params
-      );
-    }
+    // 원본 첨부는 저장하지 않음 (프라이버시)
 
     const updatedPost = await fetchPostById(postId);
     res.json(updatedPost);
