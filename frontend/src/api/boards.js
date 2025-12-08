@@ -18,6 +18,8 @@ export function getBoardPost(boardType, id) {
 export function createBoardPost(boardType, body) {
   return postJSON(`/api/posts`, {
     ...body,
+    category: boardType,
+    postBody: body.content   // 🔥 핵심: postBody 추가
   });
 }
 

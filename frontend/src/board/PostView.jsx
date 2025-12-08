@@ -6,41 +6,111 @@ import { getBoardPost, deleteBoardPost } from "../api/boards";
 
 export default function PostView() {
   const { boardType, id } = useParams();
-  const [post, setPost] = useState(null);
   const navigate = useNavigate();
+
+  const [post, setPost] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+
+  // 🔹 id가 정상적인 숫자인지 체크
+  const isValidId =
+    id !== undefined &&
+    id !== "undefined" &&
+    id !== "new" &&
+    !Number.isNaN(Number(id));
 
   // --------------------------
   // 게시글 불러오기
   // --------------------------
-  const fetch = async () => {
-    try {
-      const p = await getBoardPost(boardType, id);
-      setPost(p);
-    } catch (err) {
-      console.error("게시글 불러오기 실패:", err);
-      navigate(`/board/${boardType}`); // 에러 시 목록으로 이동
-    }
-  };
-
   useEffect(() => {
-    fetch();
-    // eslint-disable-next-line
-  }, [boardType, id]);
+    if (!isValidId) {
+      setLoading(false);
+      setLoadError("BAD_ID");
+      return;
+    }
+
+    (async () => {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        const p = await getBoardPost(boardType, id);
+        setPost(p);
+      } catch (err) {
+        console.error("게시글 불러오기 실패:", err);
+        setLoadError("LOAD_FAIL");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [boardType, id, isValidId]);
 
   // --------------------------
   // 삭제 기능
   // --------------------------
   const onDelete = async () => {
+    if (!isValidId) return;
     if (!window.confirm("정말 삭제할까요?")) return;
-    await deleteBoardPost(boardType, id).catch(() => {});
+    try {
+      await deleteBoardPost(boardType, id);
+    } catch (e) {
+      console.error("삭제 실패:", e);
+    }
     navigate(`/board/${boardType}`);
   };
 
   // --------------------------
-  // 로딩 화면
+  // 잘못된 ID 처리
   // --------------------------
-  if (!post)
-    return <div className="page-container">불러오는 중...</div>;
+  if (!isValidId) {
+    return (
+      <div className="page-container fade-in">
+        <h2 className="page-title">잘못된 게시글 주소입니다.</h2>
+        <div className="form-actions" style={{ marginTop: 24 }}>
+          <Link className="form-btn btn-cancel" to={`/board/${boardType || "free"}`}>
+            목록으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------
+  // 로딩 / 에러 화면
+  // --------------------------
+  if (loading) {
+    return (
+      <div className="page-container">
+        불러오는 중...
+      </div>
+    );
+  }
+
+  if (loadError && !post) {
+    return (
+      <div className="page-container fade-in">
+        <h2 className="page-title">게시글을 불러올 수 없습니다.</h2>
+        <p style={{ marginTop: 8, color: "#ffffffff" }}>
+          게시글이 삭제되었거나, 일시적인 오류가 발생했을 수 있습니다.
+        </p>
+        <div className="form-actions" style={{ marginTop: 24 }}>
+          <Link className="form-btn btn-cancel" to={`/board/${boardType}`}>
+            목록
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------
+  // 실제 게시글 렌더링
+  // --------------------------
+  if (!post) {
+    return (
+      <div className="page-container">
+        게시글 정보가 없습니다.
+      </div>
+    );
+  }
 
   // 모자이크 이미지(posts.images)
   const images = post.images || [];

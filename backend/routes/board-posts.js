@@ -177,7 +177,13 @@ router.get("/", async (req, res, next) => {
 // ================================
 router.get("/:id", async (req, res, next) => {
   try {
-    const post = await fetchPostById(req.params.id);
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      // /api/board-posts/undefined 같은 경우 여기로 옴
+      return res.status(400).json({ message: "BAD_POST_ID" });
+    }
+
+    const post = await fetchPostById(id);
 
     if (!post) {
       return res.status(404).json({ message: "Not Found" });
