@@ -122,6 +122,7 @@ jobs:
           docker run -d --name ${BE_PREFIX}-${BE_NEW_COLOR} -p ${BE_NEW_PORT}:8080 \
             --network cleanup-net \
             --env-file "${ENV_FILE}" \
+            -v /home/ec2-user/uploads:/app/uploads \
             -e PORT=8080 \
             -e DB_HOST="${DB_HOST}" \
             -e DB_PORT="${DB_PORT}" \
