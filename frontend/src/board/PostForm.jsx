@@ -97,13 +97,21 @@ export default function PostForm() {
     };
 
     try {
-      if (isEdit) {
-        await updateBoardPost(boardType, id, payload);
-        navigate(`/board/${boardType}/${id}`);
-      } else {
-        const created = await createBoardPost(boardType, payload);
-        navigate(`/board/${boardType}/${created.id}`);
-      }
+       if (isEdit) {
+      // ✅ 수정 → /api/board-posts → content 필요
+      await updateBoardPost(boardType, id, {
+        ...base,
+        content: form.content,      // 🔥 여기서는 content 로 보냄
+      });
+      navigate(`/board/${boardType}/${id}`);
+    } else {
+      // ✅ 새 글 작성 → /api/posts → postBody 필요
+      const created = await createBoardPost(boardType, {
+        ...base,
+        postBody: form.content,     // 🔥 여기서는 postBody 로 보냄
+      });
+      navigate(`/board/${boardType}/${created.id}`);
+    }
     } catch (err) {
       if (err?.status === 401) {
         alert("로그인을 하십시오.");
