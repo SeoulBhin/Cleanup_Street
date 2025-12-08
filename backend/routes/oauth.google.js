@@ -114,24 +114,24 @@ router.get('/callback', async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES || '30m' }
     );
 
-    // 프론트 완료되면 삭제 할 코드(백엔드 환경에서 테스트용)
+    /*
     return res.status(200).json({
       provider: 'google',
       token,
       email: userRow.email,
       role: userRow.role || 'USER',
     });
-
+*/
     // 프론트 완료되면 쓸 코드
     
-   /* const redirect = new URL(
+    const redirect = new URL(
       '/oauth/callback',
-      process.env.FRONTEND_URL || 'http://localhost:5173'
+      process.env.FRONTEND_URL || 'http://localhost:8080'
     );
     redirect.hash = `provider=google&token=${encodeURIComponent(token)}`;
 
     return res.redirect(redirect.toString());
-    */
+    
   } catch (err) {
     console.error('[google/callback] error:', err);
     return res.status(500).json({ message: 'OAuth failed', error: err.message });

@@ -138,21 +138,21 @@ router.get('/callback', async (req, res) => {
 
     res.clearCookie('kakao_oauth_state');
 
-    // (테스트용) JSON 으로 바로 응답
+   /* // (테스트용) JSON 으로 바로 응답
     return res.json({
       provider: 'kakao',
       token,
     });
-
-    // === 실제 프론트 연동 시 사용할 코드 ===
-    /*
+*/
+    // 프론트 연동 시 사용할 코드 
+    
     const redirect = new URL(
       '/oauth/callback',
-      process.env.FRONTEND_URL || 'http://localhost:5173'
+      process.env.FRONTEND_URL || 'http://localhost:8080'
     );
     redirect.hash = `provider=kakao&token=${encodeURIComponent(token)}`;
     return res.redirect(redirect.toString());
-    */
+    
   } catch (err) {
     if (err.code === '23505') {
       console.error('[kakao/callback] unique violation:', err.detail || err.message);

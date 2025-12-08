@@ -207,22 +207,26 @@ router.get('/callback', async (req, res) => {
 
     res.clearCookie('naver_oauth_state');
 
-    /*
-    return res.json({
+    
+    /*return res.json({
       provider: 'naver',
       token,
     });
     */
+    
 
     const redirect = new URL('/oauth/callback', process.env.FRONTEND_URL);
     redirect.hash = `provider=naver&token=${encodeURIComponent(token)}`;
     return res.redirect(redirect.toString());
+    
   } catch (err) {
     console.error('[naver/callback] ERROR =', err.response?.data || err);
     return res
       .status(500)
       .json({ message: 'NAVER OAuth failed', error: err.message });
+      
   }
+      
 });
 
 module.exports = router;
