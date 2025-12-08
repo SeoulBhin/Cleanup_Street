@@ -200,7 +200,7 @@ export default function RightMap() {
             p.image_url || p.imageUrl || p.image || p.thumbnail || null;
           const imageVariant = p.image_variant || p.imageVariant || "";
           const contentSnippet =
-            (p.content && String(p.content).slice(0, 80)) || "";
+            (p.content && String(p.content).slice(0, 120)) || "";
 
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             console.warn("좌표가 이상해서 스킵:", p);

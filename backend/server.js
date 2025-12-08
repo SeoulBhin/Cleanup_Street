@@ -434,7 +434,10 @@ app.get("/api/map", async (req, res) => {
         p.latitude  AS lat,
         p.longitude AS lng,
         p.h3_index::text AS h3_cell,
-        img.image_url    AS image_url,
+        COALESCE(
+          img.image_url,
+          'data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"320\" height=\"200\"%3E%3Crect width=\"320\" height=\"200\" fill=\"%23232a3b\"/%3E%3Ctext x=\"50%25\" y=\"50%25\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%237884ab\" font-size=\"14\"%3E이미지 없음%3C/text%3E%3C/svg%3E'
+        )               AS image_url,
         img.variant      AS image_variant
       FROM posts p
       LEFT JOIN LATERAL (
