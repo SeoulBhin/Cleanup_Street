@@ -53,22 +53,24 @@ async function geocodeNaver(address) {
   if (!address || !address.trim()) return null;
 
   const url =
-    "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=" +
+    "https://maps.apigw.ntruss.com/map-geocode/v2/geocode?query=" +
     encodeURIComponent(address.trim());
 
   try {
     const res = await fetch(url, {
       headers: {
-        "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
-        "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
+        // 문서에 나온 그대로 맞추기
+        "Accept": "application/json",
+        "x-ncp-apigw-api-key-id": process.env.NAVER_CLIENT_ID_Map,
+        "x-ncp-apigw-api-key": process.env.NAVER_CLIENT_SECRET_Map,
       },
     });
 
     if (!res.ok) {
-  const text = await res.text().catch(() => "");
-  console.error("[GEOCODE] naver status:", res.status, text);
-  return null;
-}
+      const text = await res.text();
+      console.error("[GEOCODE] naver status:", res.status, text);
+      return null;
+    }
 
     const data = await res.json();
     if (!data.addresses || data.addresses.length === 0) return null;
@@ -89,7 +91,6 @@ async function geocodeNaver(address) {
     return null;
   }
 }
-
 // ================== 목록 / 상세 ==================
 
 // GET posts list
