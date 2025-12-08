@@ -1,6 +1,6 @@
 // backend/utils/geocode.js
 const fetch = require("node-fetch");
-const { geoToH3 } = require("h3-js");
+const h3 = require("h3-js");
 
 // 네이버 지오코딩
 async function geocodeNaver(address) {
@@ -35,7 +35,7 @@ async function geocodeNaver(address) {
   // H3 인덱스 계산 (예외 보호)
   let h3Index = null;
   try {
-    h3Index = geoToH3(lat, lng, 8);
+    h3Index = h3.geoToH3(lat, lng, 8);
   } catch (err) {
     console.error("[GEOCODE] H3 변환 실패:", err);
     h3Index = null;

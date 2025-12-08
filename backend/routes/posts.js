@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");              // pg 래퍼 (db.query)
 const fetch = require("node-fetch");
-const { geoToH3 } = require("h3-js");
+const h3 = require("h3-js");
 
 // ================== 공통 SELECT ==================
 const BASE_SELECT = `
@@ -157,7 +157,7 @@ router.post("/", async (req, res) => {
         lng = geo.lng;
         // H3 인덱스가 아직 없다면 여기서 계산
         if (!h3Idx && lat && lng) {
-          h3Idx = geoToH3(lat, lng, 8); 
+          h3Idx = h3.geoToH3(lat, lng, 8);
         }
       } else {
         console.warn("[POSTS] geocode failed for address:", address);
@@ -286,7 +286,7 @@ router.put("/:postId", async (req, res) => {
         lat = geo.lat;
         lng = geo.lng;
         if (!h3Idx && lat && lng) {
-          h3Idx = geoToH3(lat, lng, 8);
+          h3Idx = h3.geoToH3(lat, lng, 8); 
         }
       } else {
         console.warn("[POSTS][UPDATE] geocode failed for address:", address);
