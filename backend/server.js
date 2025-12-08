@@ -353,21 +353,25 @@ app.post(
   // requireAuth,   // ⛔ 잠깐 주석 처리 (또는 삭제)
   upload.array("files", 10),
   (req, res) => {
+    const ct = req.headers["content-type"] || "";
+    if (!ct.toLowerCase().includes("multipart/form-data")) {
+      return res.status(415).json({
+        message: "Content-Type must be multipart/form-data",
+      });
+    }
+    if (!req.files || !req.files.length) {
+      return res.status(400).json({ message: "No files received" });
+    }
     const proto = req.headers["x-forwarded-proto"] || req.protocol;
     const host  = req.headers["x-forwarded-host"] || req.get("host");
     const base  = `${proto}://${host}`;
     const urls = (req.files || []).map(
       (f) => `${base}/uploads/${path.basename(f.path)}`
     );
-    if (!urls.length) {
-      console.warn("[/api/uploads] no files received");
-    } else {
-      console.log("[/api/uploads] stored:", urls);
-    }
+    console.log("[/api/uploads] stored:", urls);
     res.json({ urls });
   }
 );
-
 // ========================= 게시판(boards) 조회 전용 =========================
 
 app.get("/api/boards/:boardType", async (req, res, next) => {
@@ -672,5 +676,6 @@ app.use((err, req, res, _next) => {
 server.listen(PORT, () => {
   console.log(`API & Socket server running on http://localhost:${PORT}`);
 });
+
 
 
