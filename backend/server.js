@@ -188,6 +188,7 @@ const imagePreviewRoutes   = require("./routes/image-previews");
 const mosaicPostsRouter    = require("./routes/posts");   // /api/posts
 // 🔥 새로 추가해야 하는 라우터
 const boardPostsRouter   = require("./routes/board-posts");
+const uploadUrlRouter    = require("./routes/uploads.url");
 // ========================= 앱 / 서버 / 소켓 =========================
 
 const app = express();
@@ -329,6 +330,8 @@ app.use("/api/recovery", recoveryRoutes);
 app.use("/api/image-previews", imagePreviewRoutes);
 // 🔥 게시판(board-posts) 라우터 추가
 app.use("/api/board-posts", boardPostsRouter);
+// 외부 URL → 업로드 파일 저장 라우터
+app.use("/api/uploads/url", uploadUrlRouter);
 
 // ========================= 파일 업로드 =========================
 
