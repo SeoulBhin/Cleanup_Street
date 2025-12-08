@@ -239,7 +239,7 @@ export default function PostForm() {
           )}
           {!!(form.attachments || []).length && (
             <div style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}>
-              첨부 이미지: {form.attachments.length}개
+              첨부 완료 (모자이크 미리보기 자동 생성)
             </div>
           )}
         </div>
@@ -270,8 +270,8 @@ export default function PostForm() {
                   padding: 0,
                   background: "transparent",
                   cursor: "pointer",
-                  width: "100%",
-                  maxWidth: 520,
+                  width: "48%",
+                  minWidth: 260,
                 }}
               >
                 <img
@@ -279,7 +279,7 @@ export default function PostForm() {
                   alt="얼굴+번호판 모자이크"
                   style={{
                     width: "100%",
-                    height: 280,
+                    height: 220,
                     objectFit: "contain",
                     display: "block",
                     borderRadius: 10,
@@ -305,8 +305,8 @@ export default function PostForm() {
                   padding: 0,
                   background: "transparent",
                   cursor: "pointer",
-                  width: "100%",
-                  maxWidth: 520,
+                  width: "48%",
+                  minWidth: 260,
                 }}
               >
                 <img
@@ -314,7 +314,7 @@ export default function PostForm() {
                   alt="얼굴만 모자이크"
                   style={{
                     width: "100%",
-                    height: 280,
+                    height: 220,
                     objectFit: "contain",
                     display: "block",
                     borderRadius: 10,
