@@ -25,6 +25,8 @@ const ALLOW_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://52.63.57.185",
+  "https://52.63.57.185",
   //"http://watchout.com", // 배포 후 도메인 여기에 추가
 ];
 const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
