@@ -6,6 +6,7 @@ const fetch = require("node-fetch");
 const h3 = require("h3-js");
 const path = require("path");
 const fs = require("fs/promises");
+const crypto = require("crypto");
 
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 
@@ -17,6 +18,47 @@ function resolveUploadPath(url) {
   const filename = url.slice(uploadsIdx + "/uploads/".length).split(/[?#]/)[0];
   if (!filename) return null;
   return path.join(UPLOAD_DIR, filename);
+}
+
+// 선택된 이미지 URL을 현재 업로드 디렉터리에 복사/저장 후 새 공개 URL 반환
+async function persistImageToUploads(selectedImageUrl, req, variant = "AUTO") {
+  if (!selectedImageUrl) return null;
+  try {
+    let buf;
+    let ext = ".jpg";
+
+    if (selectedImageUrl.startsWith("data:")) {
+      const match = selectedImageUrl.match(/^data:(.*?);base64,(.*)$/);
+      if (!match) throw new Error("Invalid data URI");
+      const [, meta, b64] = match;
+      const ct = meta || "";
+      if (ct.includes("png")) ext = ".png";
+      else if (ct.includes("webp")) ext = ".webp";
+      else if (ct.includes("gif")) ext = ".gif";
+      buf = Buffer.from(b64, "base64");
+    } else {
+      const res = await fetch(selectedImageUrl);
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("png")) ext = ".png";
+      else if (ct.includes("webp")) ext = ".webp";
+      else if (ct.includes("gif")) ext = ".gif";
+      buf = Buffer.from(await res.arrayBuffer());
+    }
+
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    const filename = `${variant.toLowerCase()}-${crypto.randomBytes(8).toString("hex")}${ext}`;
+    const dest = path.join(UPLOAD_DIR, filename);
+    await fs.writeFile(dest, buf);
+
+    const proto = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.headers["x-forwarded-host"] || req.get("host");
+    const base = `${proto}://${host}`;
+    return `${base}/uploads/${filename}`;
+  } catch (err) {
+    console.warn("[persistImageToUploads] failed", err.message || err);
+    return selectedImageUrl; // 실패 시 기존 URL 그대로 사용
+  }
 }
 
 async function deleteLocalUpload(url) {
@@ -253,10 +295,15 @@ router.post("/", async (req, res) => {
         req.body.selectedVariant === "PLATE_VISIBLE"
           ? "PLATE_VISIBLE"
           : "AUTO";
-      const selectedImage =
+      const selectedImageRaw =
         selectedVariant === "PLATE_VISIBLE"
           ? previewData.plate_visible_image
           : previewData.auto_mosaic_image;
+      const selectedImage = await persistImageToUploads(
+        selectedImageRaw,
+        req,
+        selectedVariant
+      );
 
       const imageInsertQuery = `
         INSERT INTO post_images (post_id, image_url, variant)
@@ -389,10 +436,15 @@ router.put("/:postId", async (req, res) => {
           req.body.selectedVariant === "PLATE_VISIBLE"
             ? "PLATE_VISIBLE"
             : "AUTO";
-        const selectedImage =
+        const selectedImageRaw =
           selectedVariant === "PLATE_VISIBLE"
             ? previewData.plate_visible_image
             : previewData.auto_mosaic_image;
+        const selectedImage = await persistImageToUploads(
+          selectedImageRaw,
+          req,
+          selectedVariant
+        );
 
         await db.query(
           `
