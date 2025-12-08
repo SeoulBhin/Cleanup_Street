@@ -11,6 +11,8 @@ export default function PostView() {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [viewVariant, setViewVariant] = useState("AUTO"); // AUTO or PLATE_VISIBLE
+  const [selectedImageId, setSelectedImageId] = useState(null);
 
   // 🔹 id가 정상적인 숫자인지 체크
   const isValidId =
@@ -35,6 +37,8 @@ export default function PostView() {
         setLoadError(null);
         const p = await getBoardPost(boardType, id);
         setPost(p);
+        setViewVariant("AUTO");
+        setSelectedImageId(null);
       } catch (err) {
         console.error("게시글 불러오기 실패:", err);
         setLoadError("LOAD_FAIL");
@@ -113,10 +117,51 @@ export default function PostView() {
   }
 
   // 모자이크 이미지(posts.images)
-  const images = post.images || [];
+  const images = Array.isArray(post.images) ? post.images : [];
+  const attachments = Array.isArray(post.attachments) ? post.attachments : [];
 
-  // 기존 방식 attachments (서버에 없으면 빈 배열)
-  const attachments = post.attachments || [];
+  const normalizedImages = images.map((img) => ({
+    ...img,
+    variant: (img.variant || "").toUpperCase(),
+  }));
+
+  const variantImage = (variant) =>
+    normalizedImages.find((img) => img.variant === variant);
+
+  const hasAuto = !!variantImage("AUTO");
+  const hasPlateVisible = !!variantImage("PLATE_VISIBLE");
+  const hasProcessed = normalizedImages.length > 0;
+
+  const gallerySources = hasProcessed
+    ? normalizedImages
+    : attachments.map((url, idx) => ({
+        imageUrl: url,
+        variant: "ORIGINAL",
+        imageId: `attachment-${idx}`,
+      }));
+
+  const selected =
+    gallerySources.find((img) => {
+      if (selectedImageId === null) return false;
+      return img.imageId === selectedImageId;
+    }) || null;
+
+  const defaultImage =
+    (hasProcessed && (variantImage(viewVariant) || normalizedImages[0])) ||
+    gallerySources[0] ||
+    null;
+
+  const activeImage = selected || defaultImage;
+
+  const toggleVariant = () => {
+    if (viewVariant === "AUTO" && hasPlateVisible) {
+      setViewVariant("PLATE_VISIBLE");
+      setSelectedImageId(variantImage("PLATE_VISIBLE")?.imageId ?? null);
+    } else {
+      setViewVariant("AUTO");
+      setSelectedImageId(variantImage("AUTO")?.imageId ?? null);
+    }
+  };
 
   // --------------------------
   // 렌더링
@@ -148,42 +193,125 @@ export default function PostView() {
         {post.content}
       </div>
 
-      {/* 🔹 모자이크 이미지 표시 */}
-      {!!images.length && (
-        <div style={{ marginTop: 16 }}>
-          <strong>모자이크 이미지</strong>
+      {/* 🔹 이미지 영역 (모자이크/원본/처리중 상태 포함) */}
+      <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <strong>이미지</strong>
+          {!hasProcessed && !!attachments.length && (
+            <span
+              style={{
+                fontSize: 12,
+                padding: "2px 8px",
+                borderRadius: 12,
+                background: "#f97316",
+                color: "#fff",
+              }}
+            >
+              처리 중 (원본 미리보기)
+            </span>
+          )}
+          {hasProcessed && (
+            <span
+              style={{
+                fontSize: 12,
+                padding: "2px 8px",
+                borderRadius: 12,
+                background: "#0ea5e9",
+                color: "#fff",
+              }}
+            >
+              {viewVariant === "AUTO"
+                ? "얼굴+번호판 모자이크"
+                : "번호판만 모자이크 해제"}
+            </span>
+          )}
+          <button
+            className="form-btn btn-submit"
+            style={{ padding: "6px 12px" }}
+            onClick={toggleVariant}
+            disabled={!hasProcessed || (!hasAuto && !hasPlateVisible)}
+          >
+            {viewVariant === "AUTO" ? "번호판 모자이크 해제" : "전체 모자이크"}
+          </button>
+        </div>
+
+        {activeImage ? (
+          <div style={{ marginTop: 12 }}>
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 600,
+                borderRadius: 12,
+                overflow: "hidden",
+                border: "1px solid #e5e7eb",
+                background: "#0f172a",
+              }}
+            >
+              <img
+                src={activeImage.imageUrl}
+                alt={activeImage.variant || "image"}
+                style={{ width: "100%", display: "block" }}
+              />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
+              {activeImage.variant}
+              {activeImage.createdAt ? ` · ${new Date(activeImage.createdAt).toLocaleString()}` : ""}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 12, color: "#94a3b8" }}>
+            표시할 이미지가 없습니다.
+          </div>
+        )}
+
+        {gallerySources.length > 1 && (
           <div
             style={{
               display: "flex",
+              gap: 8,
               flexWrap: "wrap",
-              gap: 12,
-              marginTop: 8,
+              marginTop: 12,
             }}
           >
-            {images.map((img) => (
-              <div key={img.imageId} style={{ maxWidth: 260 }}>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                  variant: {img.variant}
-                </div>
+            {gallerySources.map((img) => (
+              <button
+                key={img.imageId || img.imageUrl}
+                onClick={() => setSelectedImageId(img.imageId || img.imageUrl)}
+                style={{
+                  border:
+                    activeImage &&
+                    (activeImage.imageId === img.imageId ||
+                      activeImage.imageUrl === img.imageUrl)
+                      ? "2px solid #0ea5e9"
+                      : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  padding: 0,
+                  background: "#0b1220",
+                  cursor: "pointer",
+                }}
+              >
                 <img
                   src={img.imageUrl}
-                  alt={img.variant}
-                  style={{
-                    width: "100%",
-                    borderRadius: 8,
-                    border: "1px solid #e5e7eb",
-                    marginTop: 4,
-                  }}
+                  alt={img.variant || "thumbnail"}
+                  style={{ width: 120, height: 80, objectFit: "cover", display: "block", borderRadius: 7 }}
+                  loading="lazy"
                 />
-              </div>
+              </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* 🔹 기존 attachments 표시 */}
+      {/* 🔹 기존 attachments 표시 (링크) */}
       {!!attachments.length && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 12 }}>
           <strong>첨부파일</strong>
           <ul>
             {attachments.map((u, idx) => (
