@@ -448,13 +448,13 @@ app.get("/api/map", async (req, res) => {
         FROM post_images pi
         WHERE pi.post_id = p.post_id
         ORDER BY
+          pi.created_at DESC,
+          pi.image_id DESC,
           CASE
             WHEN pi.variant = 'AUTO' THEN 1
             WHEN pi.variant = 'PLATE_VISIBLE' THEN 2
             ELSE 3
-          END,
-          pi.created_at DESC,
-          pi.image_id DESC
+          END
         LIMIT 1
       ) img ON TRUE
       LEFT JOIN LATERAL (
