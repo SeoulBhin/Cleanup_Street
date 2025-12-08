@@ -71,9 +71,9 @@ export default function RightMap() {
   return (
     <div className="map-section">
       <div className="map-header">
-        <h2>현장 신고 지도</h2>
+        <h2>실시간 제보 현황</h2>
         <p className="map-subtext">
-          지도 마커를 클릭하면 신고 내용과 썸네일을 확인할 수 있습니다.
+          지도 마커를 클릭하면 제보 내용을 확인할 수 있습니다.
         </p>
       </div>
 
