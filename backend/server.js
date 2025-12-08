@@ -337,6 +337,13 @@ app.get("/api/uploads/health", (_req, res) => {
   res.json({ ok: true, message: "uploads alive" });
 });
 
+// GET /api/uploads (guide only; use POST to upload)
+app.get("/api/uploads", (_req, res) => {
+  res.status(405).json({
+    message: "Use POST multipart/form-data to upload files to /api/uploads",
+  });
+});
+
 app.options("/api/uploads", cors()); // 명시적 preflight 허용
 app.post(
   "/api/uploads",
@@ -662,3 +669,5 @@ app.use((err, req, res, _next) => {
 server.listen(PORT, () => {
   console.log(`API & Socket server running on http://localhost:${PORT}`);
 });
+
+
