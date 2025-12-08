@@ -7,6 +7,7 @@ import {
   updateBoardPost,
 } from "../api/boards";
 import { uploadFiles } from "../api/uploads";
+import { createImagePreview } from "../api/previews";
 import { FORUM_CATEGORIES } from "./categories";
 
 export default function PostForm() {
@@ -21,6 +22,8 @@ export default function PostForm() {
     attachments: [],
     address: "", // ✅ 주소 필드
   });
+  const [preview, setPreview] = useState(null); // { previewId, autoUrl, plateUrl, selectedVariant }
+  const [uploading, setUploading] = useState(false);
 
   // ================= 주소 검색 (카카오 우편번호) =================
   const openAddressSearch = () => {
@@ -72,13 +75,32 @@ export default function PostForm() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     try {
+      setUploading(true);
       const { urls } = await uploadFiles(files);
       setForm((s) => ({
         ...s,
         attachments: [...(s.attachments || []), ...urls],
       }));
+
+      // 첫 번째 업로드 파일로 모자이크 미리보기 생성
+      const firstUrl = urls?.[0];
+      if (firstUrl) {
+        try {
+          const p = await createImagePreview(firstUrl);
+          setPreview({
+            previewId: p.previewId,
+            autoUrl: p.autoMosaicImage,
+            plateUrl: p.plateVisibleImage,
+            selectedVariant: "AUTO",
+          });
+        } catch (err) {
+          console.error("미리보기 생성 실패", err);
+        }
+      }
     } catch {
       alert("파일 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -96,6 +118,8 @@ export default function PostForm() {
       category: form.category, // 실제 DB category (예: 도로-교통)
       attachments: form.attachments || [],
       address: form.address?.trim() || null,
+      previewId: preview?.previewId || null,
+      selectedVariant: preview?.selectedVariant || "AUTO",
     };
 
     try {
@@ -195,6 +219,11 @@ export default function PostForm() {
         <div className="form-group">
           <label>첨부파일</label>
           <input type="file" onChange={onUpload} />
+          {uploading && (
+            <div style={{ marginTop: 6, fontSize: 14, color: "#6b7280" }}>
+              업로드 중...
+            </div>
+          )}
           {!!(form.attachments || []).length && (
             <div
               style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}
@@ -212,6 +241,72 @@ export default function PostForm() {
             </div>
           )}
         </div>
+
+        {/* 모자이크 미리보기 (작성 중 선택) */}
+        {preview && (
+          <div className="form-group">
+            <label>모자이크 선택</label>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setPreview((p) => ({ ...p, selectedVariant: "AUTO" }))
+                }
+                style={{
+                  border:
+                    preview.selectedVariant === "AUTO"
+                      ? "2px solid #0ea5e9"
+                      : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  padding: 0,
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <img
+                  src={preview.autoUrl}
+                  alt="얼굴+번호판 모자이크"
+                  style={{ width: 220, height: 150, objectFit: "cover", display: "block", borderRadius: 7 }}
+                />
+                <div style={{ padding: 6, fontSize: 13 }}>얼굴+번호판 모자이크</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPreview((p) => ({ ...p, selectedVariant: "PLATE_VISIBLE" }))
+                }
+                style={{
+                  border:
+                    preview.selectedVariant === "PLATE_VISIBLE"
+                      ? "2px solid #0ea5e9"
+                      : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  padding: 0,
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <img
+                  src={preview.plateUrl}
+                  alt="얼굴만 모자이크"
+                  style={{ width: 220, height: 150, objectFit: "cover", display: "block", borderRadius: 7 }}
+                />
+                <div style={{ padding: 6, fontSize: 13 }}>얼굴만 모자이크</div>
+              </button>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+              작성 단계에서 바로 모자이크 버전을 선택합니다. 저장 시 선택한 버전으로 게시됩니다.
+            </div>
+          </div>
+        )}
 
         {/* 내용 */}
         <div className="form-group">
