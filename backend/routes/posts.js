@@ -148,7 +148,7 @@ router.post("/", async (req, res) => {
     let lng = longitude;
     let h3Idx = h3Index;
 
-    // 2) 프론트에서 좌표는 안 주고, 주소만 있을 때 → 🔥 여기서 네이버 호출
+    // 2) 프론트에서 좌표는 안 주고, 주소만 있을 때 → 네이버 호출
     if ((!lat || !lng) && address && address.trim()) {
       const geo = await geocodeNaver(address);
       if (geo) {
@@ -215,7 +215,6 @@ router.post("/", async (req, res) => {
       lng,
     ];
 
-    // 🔥 여기: 원래 코드에서 이상하게 db.query(insertValues.length ? insertQuery : insertQuery...) 이렇게 되어 있었음
     const { rows } = await db.query(insertQuery, insertValues);
     const newPostId = rows[0].post_id;
 
@@ -251,6 +250,121 @@ router.post("/", async (req, res) => {
   } catch (err) {
     console.error("Failed to create post", err);
     res.status(500).json({ error: "Failed to create post" });
+  }
+});
+
+// ================== 글 수정 (주소 + 지도/H3 포함) ==================
+
+router.put("/:postId", async (req, res) => {
+  const { postId } = req.params;
+
+  const {
+    title,
+    postBody,
+    category,
+    latitude,
+    longitude,
+    h3Index,
+    previewId,     // 수정하면서 새 미리보기 선택했을 때만 들어옴
+    address,       // 수정 시에도 주소 문자열
+  } = req.body;
+
+  if (!title || !postBody || !category) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    let lat = latitude;
+    let lng = longitude;
+    let h3Idx = h3Index;
+
+    // 주소만 있고 좌표 없으면 네이버 호출
+    if ((!lat || !lng) && address && address.trim()) {
+      const geo = await geocodeNaver(address);
+      if (geo) {
+        lat = geo.lat;
+        lng = geo.lng;
+        if (!h3Idx && lat && lng) {
+          h3Idx = h3.geoToH3(lat, lng, 8);
+        }
+      } else {
+        console.warn("[POSTS][UPDATE] geocode failed for address:", address);
+      }
+    }
+
+    if (lat !== null && lat !== undefined) lat = Number(lat);
+    if (lng !== null && lng !== undefined) lng = Number(lng);
+
+    const location =
+      lat && lng ? `SRID=4326;POINT(${lng} ${lat})` : null;
+
+    // posts UPDATE
+    const updateQuery = `
+      UPDATE posts
+      SET
+        title      = $2,
+        content    = $3,
+        category   = $4,
+        location   = $5,
+        h3_index   = $6,
+        latitude   = $7,
+        longitude  = $8,
+        updated_at = NOW()
+      WHERE post_id = $1
+      RETURNING post_id;
+    `;
+    const updateValues = [
+      postId,
+      title,
+      postBody,
+      category,
+      location,
+      h3Idx,
+      lat,
+      lng,
+    ];
+
+    const { rows } = await db.query(updateQuery, updateValues);
+    if (!rows.length) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    // 새 previewId가 온 경우에만 이미지 추가 (필요시 기존 이미지 삭제 로직 추가 가능)
+    if (previewId) {
+      const previewResult = await db.query(
+        "SELECT auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
+        [previewId]
+      );
+      if (previewResult.rows.length) {
+        const previewData = previewResult.rows[0];
+        const selectedVariant =
+          req.body.selectedVariant === "PLATE_VISIBLE"
+            ? "PLATE_VISIBLE"
+            : "AUTO";
+        const selectedImage =
+          selectedVariant === "PLATE_VISIBLE"
+            ? previewData.plate_visible_image
+            : previewData.auto_mosaic_image;
+
+        await db.query(
+          `
+          INSERT INTO post_images (post_id, image_url, variant)
+          VALUES ($1, $2, $3);
+        `,
+          [postId, selectedImage, selectedVariant]
+        );
+        await db.query(
+          "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
+          [previewId]
+        );
+      }
+    }
+
+    const updatedPost = await fetchPostById(postId);
+    res.json(updatedPost);
+  } catch (err) {
+    console.error("Failed to update post", err);
+    res.status(500).json({ error: "Failed to update post" });
   }
 });
 
