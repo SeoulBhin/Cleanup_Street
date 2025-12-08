@@ -23,6 +23,7 @@ jobs:
       INITIAL_SLEEP: 25
       RETRIES: 12
       RETRY_INTERVAL: 5
+      BACKEND_ENV_FILE: /home/ec2-user/backend.env
 
     steps:
       # github repository에서 checkout
@@ -84,6 +85,16 @@ jobs:
           REDIS_HOST=${REDIS_HOST:-cleanup-redis}
           REDIS_PORT=${REDIS_PORT:-6379}
           REDIS_PASSWORD=${REDIS_PASSWORD:-0000}
+          ENV_FILE=${BACKEND_ENV_FILE:-/home/ec2-user/backend.env}
+
+          # Ensure env file exists and export its contents
+          if [ ! -f "${ENV_FILE}" ]; then
+            echo "❌ Env file not found at ${ENV_FILE}"
+            exit 1
+          fi
+          set -a
+          . "${ENV_FILE}"
+          set +a
 
           # Decide next colors
           BE_EXISTING=$(docker ps -q -f name=${BE_PREFIX}-blue || true)
@@ -110,6 +121,7 @@ jobs:
           # Backend: Pass DB env vars
           docker run -d --name ${BE_PREFIX}-${BE_NEW_COLOR} -p ${BE_NEW_PORT}:8080 \
             --network cleanup-net \
+            --env-file "${ENV_FILE}" \
             -e PORT=8080 \
             -e DB_HOST="${DB_HOST}" \
             -e DB_PORT="${DB_PORT}" \
@@ -120,7 +132,19 @@ jobs:
             -e REDIS_PORT="${REDIS_PORT}" \
             -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
             -e BYPASS_AUTH="${BYPASS_AUTH}" \
-            -e KAKAO_REST_API_KEY_Value="${{ secrets.KAKAO_REST_API_KEY_Value }}" \
+            -e JWT_SECRET="${JWT_SECRET}" \
+            -e JWT_EXPIRES="${JWT_EXPIRES}" \
+            -e NODE_ENV="${NODE_ENV}" \
+            -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}" \
+            -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}" \
+            -e GOOGLE_REDIRECT_URI="${GOOGLE_REDIRECT_URI}" \
+            -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID}" \
+            -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET}" \
+            -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
+            -e KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID}" \
+            -e KAKAO_CLIENT_SECRET="${KAKAO_CLIENT_SECRET}" \
+            -e KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI}" \
+            -e FRONTEND_URL="${FRONTEND_URL}" \
             ${BE_IMAGE}:${IMAGE_TAG}
 
           # Frontend
