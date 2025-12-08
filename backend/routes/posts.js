@@ -89,6 +89,8 @@ async function geocodeNaver(address) {
   }
 }
 
+console.log("[POSTS] final coords:", { lat, lng, h3Idx, address });
+
 // ================== 목록 / 상세 ==================
 
 // GET posts list

@@ -1,6 +1,3 @@
-const fetch = require("node-fetch");
-const h3 = require("h3-js");
-
 async function geocodeNaver(address) {
   if (!address || !address.trim()) return null;
 
@@ -9,6 +6,8 @@ async function geocodeNaver(address) {
     encodeURIComponent(address.trim());
 
   try {
+    console.log("[GEOCODE] naver request address:", address);
+
     const res = await fetch(url, {
       headers: {
         "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
@@ -16,30 +15,36 @@ async function geocodeNaver(address) {
       },
     });
 
+    const text = await res.text();       // 🔥 응답 몸통도 같이 찍자
     if (!res.ok) {
-      console.error("[GEOCODE] naver status:", res.status);
+      console.error("[GEOCODE] naver status:", res.status, text);
       return null;
     }
 
-    const data = await res.json();
-    if (!data.addresses || data.addresses.length === 0) return null;
+    const data = JSON.parse(text);
+    if (!data.addresses || data.addresses.length === 0) {
+      console.warn("[GEOCODE] naver no addresses:", data);
+      return null;
+    }
 
     const a = data.addresses[0];
-
     const lat = Number(a.y);
     const lng = Number(a.x);
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      console.warn("[GEOCODE] naver invalid coords:", a);
+      return null;
+    }
+
+    console.log("[GEOCODE] naver success:", lat, lng);
 
     return {
       lat,
       lng,
-      h3Index: h3.geoToH3(lat, lng, 8),
+      roadAddress: a.roadAddress || a.jibunAddress || address,
     };
   } catch (err) {
-    console.error("[GEOCODE] naver fetch error:", err);
+    console.error("[GEOCODE] naver error:", err);
     return null;
   }
 }
-
-module.exports = { geocodeNaver };
