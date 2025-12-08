@@ -88,7 +88,7 @@ export default function PostForm() {
       return;
     }
 
-    const payload = {
+    const base = {
       title: form.title,
       postBody: form.content, // ✅ 백엔드에서 요구하는 필드명
       category: form.category,
