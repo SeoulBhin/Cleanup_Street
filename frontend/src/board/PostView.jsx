@@ -120,6 +120,24 @@ export default function PostView() {
   const images = Array.isArray(post.images) ? post.images : [];
   const attachments = Array.isArray(post.attachments) ? post.attachments : [];
 
+  // 콘텐츠 안에 포함된 이미지 URL 추출
+  const extractImageUrls = (text) => {
+    if (!text || typeof text !== "string") return [];
+    const urls = [];
+    const urlRegex = /(https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
+    let match;
+    while ((match = urlRegex.exec(text)) !== null) {
+      urls.push(match[1]);
+    }
+    const uploadsRegex = /(\/uploads\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
+    while ((match = uploadsRegex.exec(text)) !== null) {
+      urls.push(match[1]);
+    }
+    return urls;
+  };
+
+  const contentImages = extractImageUrls(post.content);
+
   const normalizedImages = images.map((img) => ({
     ...img,
     variant: (img.variant || "").toUpperCase(),
@@ -132,13 +150,24 @@ export default function PostView() {
   const hasPlateVisible = !!variantImage("PLATE_VISIBLE");
   const hasProcessed = normalizedImages.length > 0;
 
-  const gallerySources = hasProcessed
-    ? normalizedImages
-    : attachments.map((url, idx) => ({
+  // attachments + content 내 이미지 URL도 썸네일로 포함 (중복 제거)
+  const attachmentImages = [...attachments, ...contentImages].reduce(
+    (acc, url) => {
+      if (!url || acc.seen.has(url)) return acc;
+      acc.seen.add(url);
+      acc.list.push({
         imageUrl: url,
         variant: "ORIGINAL",
-        imageId: `attachment-${idx}`,
-      }));
+        imageId: `attachment-${acc.list.length}`,
+      });
+      return acc;
+    },
+    { seen: new Set(), list: [] }
+  ).list;
+
+  const gallerySources = hasProcessed
+    ? normalizedImages
+    : attachmentImages;
 
   const selected =
     gallerySources.find((img) => {
