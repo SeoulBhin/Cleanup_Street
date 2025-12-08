@@ -124,16 +124,32 @@ export default function PostView() {
   const extractImageUrls = (text) => {
     if (!text || typeof text !== "string") return [];
     const urls = [];
-    const urlRegex = /(https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
+
+    // 1) http/https 전체를 먼저 추출 (공백/개행 기준)
+    const roughUrl = /(https?:\/\/\S+)/gi;
     let match;
-    while ((match = urlRegex.exec(text)) !== null) {
+    while ((match = roughUrl.exec(text)) !== null) {
       urls.push(match[1]);
     }
-    const uploadsRegex = /(\/uploads\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
+
+    // 2) /uploads/ 상대경로 추출
+    const uploadsRegex = /(\/uploads\/\S+)/gi;
     while ((match = uploadsRegex.exec(text)) !== null) {
       urls.push(match[1]);
     }
-    return urls;
+
+    // 3) 확장자 필터 및 후행 특수문자 제거
+    const cleaned = [];
+    const seen = new Set();
+    for (const url of urls) {
+      const stripped = url.replace(/[)>,\]]+$/, ""); // 뒤에 붙은 괄호/쉼표 제거
+      if (!/\.(jpg|jpeg|png|gif|webp)(\?|#|$)/i.test(stripped)) continue;
+      if (seen.has(stripped)) continue;
+      seen.add(stripped);
+      cleaned.push(stripped);
+    }
+
+    return cleaned;
   };
 
   const contentImages = extractImageUrls(post.content);
