@@ -148,24 +148,36 @@ function buildSpatialFields(lat, lng) {
 
 // ================================
 // 목록 조회  GET /api/board-posts
-//   ?boardType=도로-교통&q=검색어
+//   ?boardType=free&q=검색어
 // ================================
 router.get("/", async (req, res, next) => {
   try {
-    const { boardType, q = "" } = req.query;
+    const { boardType = "free", q = "" } = req.query;
+    const search = `%${q}%`;
 
-    const query = `
-      ${BASE_SELECT}
-      WHERE ($1::varchar IS NULL OR p.category = $1)
-        AND (p.title ILIKE $2 OR p.content ILIKE $2)
-      ORDER BY p.created_at DESC
-    `;
+    let sql;
+    let params;
 
-    const { rows } = await db.query(query, [
-      boardType || null,
-      `%${q}%`,
-    ]);
+    // 1) 전체 탭(boardType === 'free' 또는 비어 있음) ➜ 카테고리 필터 없음
+    if (!boardType || boardType === "free") {
+      sql = `
+        ${BASE_SELECT}
+        WHERE (p.title ILIKE $1 OR p.content ILIKE $1)
+        ORDER BY p.created_at DESC
+      `;
+      params = [search];
+    } else {
+      // 2) 도로-교통, 치안-범죄위험 등 실제 카테고리일 때만 필터
+      sql = `
+        ${BASE_SELECT}
+        WHERE p.category = $1
+          AND (p.title ILIKE $2 OR p.content ILIKE $2)
+        ORDER BY p.created_at DESC
+      `;
+      params = [boardType, search];
+    }
 
+    const { rows } = await db.query(sql, params);
     res.json(rows);
   } catch (err) {
     next(err);
