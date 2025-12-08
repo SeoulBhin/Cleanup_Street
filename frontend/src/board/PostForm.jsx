@@ -64,9 +64,8 @@ export default function PostForm() {
 
     const payload = {
       title: form.title,
-      content: form.content,
-      author: "로그인한유저", // 실제로는 서버에서 req.user 로 처리
-      boardType,
+      postBody: form.content,
+      // author: "로그인한유저", // 실제로는 서버에서 req.user 로 처리
       category: form.category,
       attachments: form.attachments || [],
       address: form.address?.trim() || null,
