@@ -221,6 +221,8 @@ router.post("/", requireAuth, async (req, res, next) => {
       latitude = null,
       longitude = null,
       attachments = [],
+      previewId = null,
+      selectedVariant = "AUTO",
     } = req.body;
 
     if (!title || !content || !category) {
@@ -268,7 +270,49 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const postId = rows[0].id;
 
-    // 4) 첨부 이미지가 있으면 post_images에 저장
+    // 4) 🔥 미리보기(previewId)가 있으면 모자이크 이미지 1장 붙이기
+    if (previewId) {
+      try {
+        const { rows: previewRows } = await db.query(
+          `
+          SELECT auto_mosaic_image, plate_visible_image
+          FROM image_previews
+          WHERE preview_id = $1
+          `,
+          [previewId]
+        );
+
+        if (previewRows.length) {
+          const preview = previewRows[0];
+          const variant =
+            selectedVariant === "PLATE_VISIBLE" ? "PLATE_VISIBLE" : "AUTO";
+          const imageUrl =
+            variant === "PLATE_VISIBLE"
+              ? preview.plate_visible_image
+              : preview.auto_mosaic_image;
+
+          // post_images 테이블에 실제 게시글 이미지로 저장
+          await db.query(
+            `
+            INSERT INTO post_images (post_id, image_url, variant)
+            VALUES ($1, $2, $3)
+            `,
+            [postId, imageUrl, variant]
+          );
+
+          // (선택) 해당 preview는 사용 완료 표시
+          await db.query(
+            `UPDATE image_previews SET is_used = true WHERE preview_id = $1`,
+            [previewId]
+          );
+        }
+      } catch (e) {
+        // 미리보기 연결 실패해도 글 작성 자체는 살려두고, 로그만 남김
+        console.error("[POSTS] preview attach error:", e);
+      }
+    }
+
+    // 5) 추가 첨부(attachments)도 있으면 post_images에 저장
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const params = [postId];
       const values = attachments.map((url, idx) => {
