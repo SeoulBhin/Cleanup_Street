@@ -199,7 +199,7 @@ export default function PostForm() {
             <div
               style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}
             >
-              첨부됨:
+              첨부:
               <ul>
                 {form.attachments.map((u, idx) => (
                   <li key={idx}>
