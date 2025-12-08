@@ -5,3 +5,5 @@ RSA.pem
 /backend/scripts/mosaic/.venv/
 next.txt
 db
+.env
+backend/.env

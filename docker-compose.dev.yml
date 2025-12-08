@@ -8,6 +8,8 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    env_file:
+      - ./backend/.env
     environment:
       - PORT=8080
       - DB_HOST=52.63.57.185
