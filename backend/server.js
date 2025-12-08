@@ -430,6 +430,7 @@ app.get("/api/map", async (req, res) => {
       SELECT
         p.post_id AS id,
         p.title,
+        p.content,
         p.latitude  AS lat,
         p.longitude AS lng,
         p.h3_index::text AS h3_cell,
