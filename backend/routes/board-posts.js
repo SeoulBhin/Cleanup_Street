@@ -52,8 +52,62 @@ const BASE_SELECT = `
 const fetchPostById = async (postId) => {
   const query = `${BASE_SELECT} WHERE p.post_id = $1`;
   const { rows } = await db.query(query, [postId]);
-  return rows[0];
+  return rows[0] ? enrichImages(rows[0]) : null;
 };
+
+/**
+ * content 안에 포함된 이미지 URL까지 병합
+ * - post_images에 없는 경우도 ORIGINAL variant로 내려줘서 프론트에서 <img>로 렌더 가능
+ */
+function enrichImages(row) {
+  if (!row) return row;
+
+  const images = Array.isArray(row.images) ? row.images : [];
+  const existing = new Set(images.map((i) => i.imageUrl));
+
+  const content = row.content || "";
+  const urlRegex = /(https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
+  const fallbackUrls = [];
+
+  let match;
+  while ((match = urlRegex.exec(content)) !== null) {
+    const url = match[1];
+    if (!existing.has(url)) fallbackUrls.push(url);
+  }
+
+  // uploads 경로만 적힌 경우도 처리 (절대 URL로 오는 케이스 우선)
+  const uploadsRegex = /(\/uploads\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
+  while ((match = uploadsRegex.exec(content)) !== null) {
+    const url = match[1];
+    if (!existing.has(url) && !fallbackUrls.includes(url)) {
+      fallbackUrls.push(url);
+    }
+  }
+
+  const mergedImages = images.concat(
+    fallbackUrls.map((url, idx) => ({
+      imageId: `fallback-${idx}`,
+      variant: "ORIGINAL",
+      imageUrl: url,
+      createdAt: row.created_at,
+    }))
+  );
+
+  const mergedAttachments = [];
+  const seen = new Set();
+  for (const u of [...(row.attachments || []), ...fallbackUrls]) {
+    if (u && !seen.has(u)) {
+      seen.add(u);
+      mergedAttachments.push(u);
+    }
+  }
+
+  return {
+    ...row,
+    images: mergedImages,
+    attachments: mergedAttachments,
+  };
+}
 
 /**
  * 주소 처리 공통 함수
@@ -178,7 +232,7 @@ router.get("/", async (req, res, next) => {
     }
 
     const { rows } = await db.query(sql, params);
-    res.json(rows);
+    res.json(rows.map(enrichImages));
   } catch (err) {
     next(err);
   }
