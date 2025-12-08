@@ -11,8 +11,8 @@ async function geocodeNaver(address) {
   try {
     const res = await fetch(url, {
       headers: {
-        "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID,
-        "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET,
+        "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
+        "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
       },
     });
 
