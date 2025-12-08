@@ -1,52 +1,45 @@
-// backend/utils/geocode.js
 const fetch = require("node-fetch");
+const h3 = require("h3-js");
 
-async function geocodeAddress(address) {
-  if (!address) return null;
-
-  const REST_KEY = process.env.KAKAO_REST_API_KEY_Value;
-  if (!REST_KEY) {
-    console.warn("⚠ KAKAO_REST_API_KEY 미설정 → 지오코딩 건너뜀");
-    return null;
-  }
+async function geocodeNaver(address) {
+  if (!address || !address.trim()) return null;
 
   const url =
-    "https://dapi.kakao.com/v2/local/search/address.json?query=" +
-    encodeURIComponent(address);
+    "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=" +
+    encodeURIComponent(address.trim());
 
   try {
     const res = await fetch(url, {
       headers: {
-        Authorization: `KakaoAK ${REST_KEY}`,
+        "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID,
+        "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET,
       },
     });
 
     if (!res.ok) {
-      console.error("geocodeAddress error status:", res.status);
+      console.error("[GEOCODE] naver status:", res.status);
       return null;
     }
 
-    const data = await res.json().catch(() => null);
-    if (!data || !Array.isArray(data.documents) || data.documents.length === 0) {
-      return null;
-    }
+    const data = await res.json();
+    if (!data.addresses || data.addresses.length === 0) return null;
 
-    const doc = data.documents[0];
-    const lat = parseFloat(doc.y);
-    const lng = parseFloat(doc.x);
+    const a = data.addresses[0];
 
-    if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+    const lat = Number(a.y);
+    const lng = Number(a.x);
 
-    const normalizedAddress =
-      (doc.road_address && doc.road_address.address_name) ||
-      (doc.address && doc.address.address_name) ||
-      address;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-    return { lat, lng, normalizedAddress };
+    return {
+      lat,
+      lng,
+      h3Index: h3.geoToH3(lat, lng, 8),
+    };
   } catch (err) {
-    console.error("geocodeAddress fetch error:", err);
+    console.error("[GEOCODE] naver fetch error:", err);
     return null;
   }
 }
 
-module.exports = { geocodeAddress };
+module.exports = { geocodeNaver };

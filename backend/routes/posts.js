@@ -5,8 +5,6 @@ const db = require("../db");              // pg 래퍼 (db.query)
 const fetch = require("node-fetch");
 const h3 = require("h3-js");
 
-const KAKAO_KEY = process.env.KAKAO_REST_API_KEY_Value;
-
 // ================== 공통 SELECT ==================
 const BASE_SELECT = `
   SELECT
@@ -49,37 +47,44 @@ async function fetchPostById(postId) {
   return rows[0] || null;
 }
 
-// ================== 주소 → 좌표(H3) 유틸 ==================
-async function geocodeAddress(address) {
+// ================== 주소 → 좌표 (네이버 지오코딩) ==================
+
+async function geocodeNaver(address) {
   if (!address || !address.trim()) return null;
 
-  try {
-    const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(
-      address.trim()
-    )}`;
+  const url =
+    "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=" +
+    encodeURIComponent(address.trim());
 
-    const resp = await fetch(url, {
-      headers: { Authorization: `KakaoAK ${KAKAO_KEY}` },
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
+        "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
+      },
     });
 
-    if (!resp.ok) {
-      console.error("[GEOCODE] kakao status:", resp.status);
+    if (!res.ok) {
+      console.error("[GEOCODE] naver status:", res.status);
       return null;
     }
 
-    const data = await resp.json();
-    const doc = (data.documents || [])[0];
-    if (!doc) return null;
+    const data = await res.json();
+    if (!data.addresses || data.addresses.length === 0) return null;
 
-    const longitude = parseFloat(doc.x); // 경도
-    const latitude = parseFloat(doc.y);  // 위도
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    const a = data.addresses[0];
+    const lat = Number(a.y);
+    const lng = Number(a.x);
 
-    const h3Index = h3.geoToH3(latitude, longitude, 8); // 해상도 8 (필요시 조절)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-    return { latitude, longitude, h3Index };
-  } catch (e) {
-    console.error("[GEOCODE] error:", e.message || e);
+    return {
+      lat,
+      lng,
+      roadAddress: a.roadAddress || a.jibunAddress || address,
+    };
+  } catch (err) {
+    console.error("[GEOCODE] naver error:", err.message || err);
     return null;
   }
 }
@@ -130,7 +135,7 @@ router.post("/", async (req, res) => {
     longitude,
     h3Index,
     previewId,
-    address,     // 🔥 프론트에서 온 주소(카카오 검색)
+    address, // 🔥 프론트에서 온 도로명 주소(카카오/네이버 검색 값)
   } = req.body;
 
   if (!title || !postBody || !category) {
@@ -138,22 +143,29 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // 1) lat/lng/h3 기본값: 프론트에서 직접 준 값
+    // 1) 기본값: 프론트에서 이미 줬다면 그 값 사용
     let lat = latitude;
     let lng = longitude;
     let h3Idx = h3Index;
 
-    // 2) 프론트에서 좌표를 안 주고 주소만 있을 때 → 카카오 지오코딩
+    // 2) 프론트에서 좌표는 안 주고, 주소만 있을 때 → 🔥 여기서 네이버 호출
     if ((!lat || !lng) && address && address.trim()) {
-      const geo = await geocodeAddress(address);
+      const geo = await geocodeNaver(address);
       if (geo) {
-        lat = geo.latitude;
-        lng = geo.longitude;
-        if (!h3Idx) h3Idx = geo.h3Index;
+        lat = geo.lat;
+        lng = geo.lng;
+        // H3 인덱스가 아직 없다면 여기서 계산
+        if (!h3Idx && lat && lng) {
+          h3Idx = h3.geoToH3(lat, lng, 8);
+        }
       } else {
         console.warn("[POSTS] geocode failed for address:", address);
       }
     }
+
+    // 숫자 형 변환(혹시 문자열로 왔을 경우 대비)
+    if (lat !== null && lat !== undefined) lat = Number(lat);
+    if (lng !== null && lng !== undefined) lng = Number(lng);
 
     // 3) location (geometry) 생성
     const location =
@@ -203,6 +215,7 @@ router.post("/", async (req, res) => {
       lng,
     ];
 
+    // 🔥 여기: 원래 코드에서 이상하게 db.query(insertValues.length ? insertQuery : insertQuery...) 이렇게 되어 있었음
     const { rows } = await db.query(insertQuery, insertValues);
     const newPostId = rows[0].post_id;
 
