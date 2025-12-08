@@ -453,7 +453,8 @@ app.get("/api/map", async (req, res) => {
             WHEN pi.variant = 'PLATE_VISIBLE' THEN 2
             ELSE 3
           END,
-          pi.image_id
+          pi.created_at DESC,
+          pi.image_id DESC
         LIMIT 1
       ) img ON TRUE
       LEFT JOIN LATERAL (

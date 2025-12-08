@@ -4,6 +4,34 @@ const router = express.Router();
 const db = require("../db");              // pg 래퍼 (db.query)
 const fetch = require("node-fetch");
 const h3 = require("h3-js");
+const path = require("path");
+const fs = require("fs/promises");
+
+const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
+
+function resolveUploadPath(url) {
+  if (!url || typeof url !== "string") return null;
+  // data URI나 http(s):// 이 아닌 경우 스킵
+  const uploadsIdx = url.indexOf("/uploads/");
+  if (uploadsIdx === -1) return null;
+  const filename = url.slice(uploadsIdx + "/uploads/".length).split(/[?#]/)[0];
+  if (!filename) return null;
+  return path.join(UPLOAD_DIR, filename);
+}
+
+async function deleteLocalUpload(url) {
+  const filePath = resolveUploadPath(url);
+  if (!filePath) return;
+  try {
+    await fs.unlink(filePath);
+    console.log("[uploads] removed", filePath);
+  } catch (err) {
+    // 파일이 없으면 무시
+    if (err.code !== "ENOENT") {
+      console.warn("[uploads] delete failed", filePath, err.message);
+    }
+  }
+}
 
 // ================== 공통 SELECT ==================
 const BASE_SELECT = `
@@ -176,7 +204,7 @@ router.post("/", async (req, res) => {
     let previewData = null;
     if (previewId) {
       const previewResult = await db.query(
-        "SELECT auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
+        "SELECT original_image_url, auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
         [previewId]
       );
       if (previewResult.rows.length === 0) {
@@ -243,6 +271,20 @@ router.post("/", async (req, res) => {
         "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
         [previewId]
       );
+      // 선택하지 않은 미리보기 파일/레코드 정리
+      const deleteTargets = [];
+      const originalUrl = previewData.original_image_url;
+      if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
+        deleteTargets.push(previewData.plate_visible_image);
+      }
+      if (selectedVariant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
+        deleteTargets.push(previewData.auto_mosaic_image);
+      }
+      if (originalUrl) deleteTargets.push(originalUrl);
+      await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
+      await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
+        previewId,
+      ]);
     }
 
     // 원본 첨부는 저장하지 않음 (프라이버시)
@@ -338,7 +380,7 @@ router.put("/:postId", async (req, res) => {
     // 새 previewId가 온 경우에만 이미지 추가 (필요시 기존 이미지 삭제 로직 추가 가능)
     if (previewId) {
       const previewResult = await db.query(
-        "SELECT auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
+        "SELECT original_image_url, auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
         [previewId]
       );
       if (previewResult.rows.length) {
@@ -363,6 +405,21 @@ router.put("/:postId", async (req, res) => {
           "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
           [previewId]
         );
+
+        // 선택하지 않은 미리보기/원본 파일 정리 후 미리보기 레코드 삭제
+        const deleteTargets = [];
+        const originalUrl = previewData.original_image_url;
+        if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
+          deleteTargets.push(previewData.plate_visible_image);
+        }
+        if (selectedVariant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
+          deleteTargets.push(previewData.auto_mosaic_image);
+        }
+        if (originalUrl) deleteTargets.push(originalUrl);
+        await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
+        await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
+          previewId,
+        ]);
       }
     }
 
