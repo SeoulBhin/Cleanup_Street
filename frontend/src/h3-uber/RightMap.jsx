@@ -199,6 +199,8 @@ export default function RightMap() {
           const thumbnail =
             p.image_url || p.imageUrl || p.image || p.thumbnail || null;
           const imageVariant = p.image_variant || p.imageVariant || "";
+          const contentSnippet =
+            (p.content && String(p.content).slice(0, 80)) || "";
 
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             console.warn("좌표가 이상해서 스킵:", p);
@@ -238,14 +240,27 @@ export default function RightMap() {
                   <strong>{p.title || "제목 없음"}</strong>
                   <br />
                   위도: {lat.toFixed(5)}, 경도: {lng.toFixed(5)}
+                  {contentSnippet && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: 12,
+                        color: "#6b7280",
+                        maxWidth: 220,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {contentSnippet}
+                    </div>
+                  )}
                   {thumbnail && (
                     <div style={{ marginTop: 8 }}>
                       <img
                         src={thumbnail}
                         alt={p.title || "post image"}
                         style={{
-                          width: 180,
-                          height: 120,
+                          width: 220,
+                          height: 140,
                           objectFit: "cover",
                           borderRadius: 8,
                           display: "block",
