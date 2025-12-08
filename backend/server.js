@@ -436,6 +436,7 @@ app.get("/api/map", async (req, res) => {
         p.h3_index::text AS h3_cell,
         COALESCE(
           img.image_url,
+          content_img.url,
           'data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"320\" height=\"200\"%3E%3Crect width=\"320\" height=\"200\" fill=\"%23232a3b\"/%3E%3Ctext x=\"50%25\" y=\"50%25\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%237884ab\" font-size=\"14\"%3E이미지 없음%3C/text%3E%3C/svg%3E'
         )               AS image_url,
         img.variant      AS image_variant
@@ -455,6 +456,15 @@ app.get("/api/map", async (req, res) => {
           pi.image_id
         LIMIT 1
       ) img ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          -- 1) https?://...jpg|png|gif|webp
+          COALESCE(
+            (regexp_match(p.content, '(https?://[^\\s\\\"]+\\.(?:jpg|jpeg|png|gif|webp))'))[1],
+            -- 2) /uploads/ 로 시작하는 경로
+            (regexp_match(p.content, '(/uploads/[^\\s\\\"]+\\.(?:jpg|jpeg|png|gif|webp))'))[1]
+          ) AS url
+      ) content_img ON TRUE
       WHERE p.latitude  IS NOT NULL
         AND p.longitude IS NOT NULL
       ORDER BY p.created_at DESC
