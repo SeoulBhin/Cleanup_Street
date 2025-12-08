@@ -4,69 +4,6 @@ const router = express.Router();
 const db = require("../db");              // pg 래퍼 (db.query)
 const fetch = require("node-fetch");
 const h3 = require("h3-js");
-const path = require("path");
-const fs = require("fs").promises;
-
-// 로컬 uploads 경로 (server.js와 동일하게 계산)
-const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
-
-function guessMime(src) {
-  const lower = (src || "").toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".webp")) return "image/webp";
-  return "image/jpeg";
-}
-
-// /uploads/xxx.jpg 같은 로컬 경로를 실제 파일 경로로 변환
-function resolveLocalPath(src) {
-  if (!src || typeof src !== "string") return null;
-  if (src.startsWith("/uploads/")) {
-    const filename = path.basename(src.split("?")[0]);
-    return path.join(UPLOAD_DIR, filename);
-  }
-  // 상대 경로로 들어온 경우도 방어적으로 처리
-  if (!src.startsWith("http") && !path.isAbsolute(src)) {
-    const filename = path.basename(src.split("?")[0]);
-    return path.join(UPLOAD_DIR, filename);
-  }
-  if (path.isAbsolute(src)) return src;
-  return null;
-}
-
-async function toDataUri(src) {
-  if (!src || typeof src !== "string") return src;
-  if (src.startsWith("data:")) return src; // 이미 base64
-  const mime = guessMime(src);
-
-  // 1) 로컬 파일 시도
-  const local = resolveLocalPath(src);
-  if (local) {
-    try {
-      const buf = await fs.readFile(local);
-      return `data:${mime};base64,${buf.toString("base64")}`;
-    } catch (err) {
-      console.warn("[toDataUri] local read failed:", local, err?.message);
-    }
-  }
-
-  // 2) 원격 URL 시도
-  if (src.startsWith("http")) {
-    try {
-      const res = await fetch(src);
-      if (!res.ok) throw new Error(`http ${res.status}`);
-      const arrayBuf = await res.arrayBuffer();
-      const buf = Buffer.from(arrayBuf);
-      const ct = res.headers.get("content-type") || mime;
-      return `data:${ct};base64,${buf.toString("base64")}`;
-    } catch (err) {
-      console.warn("[toDataUri] remote fetch failed:", src, err?.message);
-    }
-  }
-
-  // 실패하면 원본 문자열 반환
-  return src;
-}
 
 // ================== 공통 SELECT ==================
 const BASE_SELECT = `
@@ -289,11 +226,10 @@ router.post("/", async (req, res) => {
         req.body.selectedVariant === "PLATE_VISIBLE"
           ? "PLATE_VISIBLE"
           : "AUTO";
-      const rawImage =
+      const selectedImage =
         selectedVariant === "PLATE_VISIBLE"
           ? previewData.plate_visible_image
           : previewData.auto_mosaic_image;
-      const selectedImage = await toDataUri(rawImage);
 
       const imageInsertQuery = `
         INSERT INTO post_images (post_id, image_url, variant)
@@ -312,12 +248,9 @@ router.post("/", async (req, res) => {
 
     // 5-1) 추가 첨부(원본)도 post_images에 저장
     if (Array.isArray(attachments) && attachments.length > 0) {
-      const converted = await Promise.all(
-        attachments.map((url) => toDataUri(url))
-      );
       const params = [newPostId];
-      const values = converted.map((dataUri, idx) => {
-        params.push(dataUri);
+      const values = attachments.map((url, idx) => {
+        params.push(url);
         return `($1, $${idx + 2}, 'ORIGINAL')`;
       });
       await db.query(
@@ -430,11 +363,10 @@ router.put("/:postId", async (req, res) => {
           req.body.selectedVariant === "PLATE_VISIBLE"
             ? "PLATE_VISIBLE"
             : "AUTO";
-        const rawImage =
+        const selectedImage =
           selectedVariant === "PLATE_VISIBLE"
             ? previewData.plate_visible_image
             : previewData.auto_mosaic_image;
-        const selectedImage = await toDataUri(rawImage);
 
         await db.query(
           `
@@ -452,12 +384,9 @@ router.put("/:postId", async (req, res) => {
 
     // 첨부 배열이 오면 ORIGINAL로 추가 저장 (덮어쓰지 않고 append)
     if (Array.isArray(attachments) && attachments.length > 0) {
-      const converted = await Promise.all(
-        attachments.map((url) => toDataUri(url))
-      );
       const params = [postId];
-      const values = converted.map((dataUri, idx) => {
-        params.push(dataUri);
+      const values = attachments.map((url, idx) => {
+        params.push(url);
         return `($1, $${idx + 2}, 'ORIGINAL')`;
       });
       await db.query(
