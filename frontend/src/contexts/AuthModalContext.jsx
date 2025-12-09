@@ -23,6 +23,7 @@ export function AuthModalProvider({ children }) {
 
     const openSignupModal = useCallback(() => {
         setIsLoginModalOpen(false);
+        // 🚨 오타 수정 완료
         setIsSignupModalOpen(true); 
     }, []);
     
@@ -59,5 +60,4 @@ export function AuthModalProvider({ children }) {
             {children}
         </AuthModalContext.Provider>
     );
-
 }
