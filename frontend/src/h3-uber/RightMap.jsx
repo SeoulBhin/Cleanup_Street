@@ -113,11 +113,11 @@ export default function RightMap() {
               const imageUrl = item.image_url || FALLBACK_IMAGE;
 
               // 📌 1) 핀 위치의 H3 인덱스 계산 (resolution 9: 도시 기준으로 적당히 작은 크기)
-              const h3Index = latLngToCell(lat, lng, 9);
+              const h3Index = latLngToCell(lng, lat, 9);
 
               // 📌 2) H3 육각형 boundary → Leaflet Polygon 좌표로 변환
               const hexBoundary = cellToBoundary(h3Index, true).map(
-                ([hLat, hLng]) => [hLat, hLng]
+                ([hLat, hLng]) => [hLng, hLat]
               );
 
               return (
