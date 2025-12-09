@@ -1,59 +1,50 @@
-import React, { useState } from 'react';
-import LoginModal from './LoginModal';
-import SignupModal from './SignupModal'; // SignupModal 컴포넌트 import
-
+import React from 'react';
+import { useAuthModal } from '../contexts/AuthModalContext';
 export default function Header({ onLogoClick }) {
-  // 1. 모달 상태 관리: 로그인과 회원가입 모두 필요
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  // 기존 openSignupModal 대신 Header 내에서 상태 관리
-  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false); 
+    const { 
+        isLoggedIn, 
+        userInfo, 
+        handleLogout, 
+        openLoginModal, 
+        openSignupModal 
+    } = useAuthModal();
+    
+    
+    // 로그인 전 UI (폼 + 로그인/회원가입 버튼)
+    const LoggedOutView = () => (
+        <>
+            
+            <button className="btn btn-login" onClick={openLoginModal}>
+                로그인
+            </button>
+            <button className="btn btn-signup" onClick={openSignupModal}>
+                회원가입
+            </button>
+        </>
+    );
 
-  const openLoginModal = () => {
-    setIsSignupModalOpen(false); // 혹시 열려있을 경우 닫고
-    setIsLoginModalOpen(true);
-  };
-  const closeLoginModal = () => setIsLoginModalOpen(false);
+    // 로그인 후 UI (환영 메시지 + 로그아웃 버튼)
+    const LoggedInView = () => (
+        <>
+            <span className="welcome-message">
+                {userInfo?.username ? `${userInfo.username}님 반갑습니다!` : '사용자님 반갑습니다!'}
+            </span>
+            <button className="btn btn-login" onClick={handleLogout}>
+                로그아웃
+            </button>
+        </>
+    );
 
-  const openSignupModal = () => {
-    setIsLoginModalOpen(false); // 혹시 열려있을 경우 닫고
-    setIsSignupModalOpen(true);
-  };
-  const closeSignupModal = () => setIsSignupModalOpen(false);
 
-
-  return (
-    <>
-      <header className="app-header">
-        <h1 onClick={onLogoClick} style={{ userSelect: "none" }}>
-          와챠우! (Watch out!)
-        </h1>
-        <div className="login-section">
-          
-          <button className="btn btn-login" onClick={openLoginModal}>
-            로그인
-          </button>
-
-          <button className="btn btn-signup" onClick={openSignupModal}>
-            회원가입
-          </button>
-        </div>
-      </header>
-
-      {/* 2. 로그인 모달 렌더링 */}
-      {isLoginModalOpen && (
-        <LoginModal 
-            onClose={closeLoginModal} 
-            openSignupModal={openSignupModal}
-        />
-      )}
-
-      {/* 3. 회원가입 모달 렌더링 */}
-      {isSignupModalOpen && (
-        <SignupModal 
-            onClose={closeSignupModal} 
-            openLoginModal={openLoginModal} // 회원가입 모달에 로그인 모달을 열어주는 함수 전달
-        />
-      )}
-    </>
-  );
+    return (
+        <header className="app-header">
+            <h1 onClick={onLogoClick} style={{ userSelect: "none" }}>
+                와챠우! (Watch out!)
+            </h1>
+            <div className="login-section">
+                {/* Context 상태에 따른 조건부 렌더링 */}
+                {isLoggedIn ? <LoggedInView /> : <LoggedOutView />}
+            </div>
+        </header>
+    );
 }
