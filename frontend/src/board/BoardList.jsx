@@ -24,7 +24,7 @@ export default function BoardList() {
     try {
         const list = await listBoardPosts(boardType, q);
         
-        // 수정된 부분: list가 배열인지 확인하고, 아니면 빈 배열을 사용합니다.
+        // 💡 수정된 부분: list가 배열인지 확인하고, 아니면 빈 배열을 사용합니다.
         const safeList = Array.isArray(list) ? list : []; 
         setRows(safeList);
         
