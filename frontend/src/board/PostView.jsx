@@ -1,191 +1,50 @@
-// src/components/PostView.jsx
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getBoardPost, deleteBoardPost } from "../api/boards";
 
 export default function PostView() {
   const { boardType, id } = useParams();
-  const navigate = useNavigate();
-
   const [post, setPost] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
-  const [selectedImageId, setSelectedImageId] = useState(null);
-
-  // 🔹 id가 정상적인 숫자인지 체크
-  const isValidId =
-    id !== undefined &&
-    id !== "undefined" &&
-    id !== "new" &&
-    !Number.isNaN(Number(id));
+  const navigate = useNavigate();
 
   // --------------------------
   // 게시글 불러오기
   // --------------------------
-  useEffect(() => {
-    if (!isValidId) {
-      setLoading(false);
-      setLoadError("BAD_ID");
-      return;
+  const fetch = async () => {
+    try {
+      const p = await getBoardPost(boardType, id);
+      setPost(p);
+    } catch (err) {
+      console.error("게시글 불러오기 실패:", err);
+      navigate(`/board/${boardType}`); // 에러 시 목록으로 이동
     }
+  };
 
-    (async () => {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        const p = await getBoardPost(boardType, id);
-        setPost(p);
-        setSelectedImageId(null);
-      } catch (err) {
-        console.error("게시글 불러오기 실패:", err);
-        setLoadError("LOAD_FAIL");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [boardType, id, isValidId]);
+  useEffect(() => {
+    fetch();
+    // eslint-disable-next-line
+  }, [boardType, id]);
 
   // --------------------------
   // 삭제 기능
   // --------------------------
   const onDelete = async () => {
-    if (!isValidId) return;
     if (!window.confirm("정말 삭제할까요?")) return;
-    try {
-      await deleteBoardPost(boardType, id);
-    } catch (e) {
-      console.error("삭제 실패:", e);
-    }
+    await deleteBoardPost(boardType, id).catch(() => {});
     navigate(`/board/${boardType}`);
   };
 
   // --------------------------
-  // 잘못된 ID 처리
+  // 로딩 화면
   // --------------------------
-  if (!isValidId) {
-    return (
-      <div className="page-container fade-in">
-        <h2 className="page-title">잘못된 게시글 주소입니다.</h2>
-        <div className="form-actions" style={{ marginTop: 24 }}>
-          <Link className="form-btn btn-cancel" to={`/board/${boardType || "free"}`}>
-            목록으로 돌아가기
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // --------------------------
-  // 로딩 / 에러 화면
-  // --------------------------
-  if (loading) {
-    return (
-      <div className="page-container">
-        불러오는 중...
-      </div>
-    );
-  }
-
-  if (loadError && !post) {
-    return (
-      <div className="page-container fade-in">
-        <h2 className="page-title">게시글을 불러올 수 없습니다.</h2>
-        <p style={{ marginTop: 8, color: "#ffffffff" }}>
-          게시글이 삭제되었거나, 일시적인 오류가 발생했을 수 있습니다.
-        </p>
-        <div className="form-actions" style={{ marginTop: 24 }}>
-          <Link className="form-btn btn-cancel" to={`/board/${boardType}`}>
-            목록
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // --------------------------
-  // 실제 게시글 렌더링
-  // --------------------------
-  if (!post) {
-    return (
-      <div className="page-container">
-        게시글 정보가 없습니다.
-      </div>
-    );
-  }
+  if (!post)
+    return <div className="page-container">불러오는 중...</div>;
 
   // 모자이크 이미지(posts.images)
-  const images = Array.isArray(post.images) ? post.images : [];
-  const attachments = Array.isArray(post.attachments) ? post.attachments : [];
+  const images = post.images || [];
 
-  // 콘텐츠 안에 포함된 이미지 URL 추출
-  const extractImageUrls = (text) => {
-    if (!text || typeof text !== "string") return [];
-    const urls = [];
-
-    // 1) http/https 전체를 먼저 추출 (공백/개행 기준)
-    const roughUrl = /(https?:\/\/\S+)/gi;
-    let match;
-    while ((match = roughUrl.exec(text)) !== null) {
-      urls.push(match[1]);
-    }
-
-    // 2) /uploads/ 상대경로 추출
-    const uploadsRegex = /(\/uploads\/\S+)/gi;
-    while ((match = uploadsRegex.exec(text)) !== null) {
-      urls.push(match[1]);
-    }
-
-    // 3) 확장자 필터 및 후행 특수문자 제거
-    const cleaned = [];
-    const seen = new Set();
-    for (const url of urls) {
-      const stripped = url.replace(/[)>,\]]+$/, ""); // 뒤에 붙은 괄호/쉼표 제거
-      if (!/\.(jpg|jpeg|png|gif|webp)(\?|#|$)/i.test(stripped)) continue;
-      if (seen.has(stripped)) continue;
-      seen.add(stripped);
-      cleaned.push(stripped);
-    }
-
-    return cleaned;
-  };
-
-  const contentImages = extractImageUrls(post.content);
-
-  const normalizedImages = images.map((img) => ({
-    ...img,
-    variant: (img.variant || "").toUpperCase(),
-  }));
-
-  const hasProcessed = normalizedImages.length > 0;
-
-  // attachments + content 내 이미지 URL도 썸네일로 포함 (중복 제거)
-  const attachmentImages = [...attachments, ...contentImages].reduce(
-    (acc, url) => {
-      if (!url || acc.seen.has(url)) return acc;
-      acc.seen.add(url);
-      acc.list.push({
-        imageUrl: url,
-        variant: "ORIGINAL",
-        imageId: `attachment-${acc.list.length}`,
-      });
-      return acc;
-    },
-    { seen: new Set(), list: [] }
-  ).list;
-
-  const gallerySources = hasProcessed
-    ? normalizedImages
-    : attachmentImages;
-
-  const selected =
-    gallerySources.find((img) => {
-      if (selectedImageId === null) return false;
-      return img.imageId === selectedImageId;
-    }) || null;
-
-  const defaultImage = gallerySources[0] || null;
-  const activeImage = selected || defaultImage;
+  // 기존 방식 attachments (서버에 없으면 빈 배열)
+  const attachments = post.attachments || [];
 
   // --------------------------
   // 렌더링
@@ -217,112 +76,54 @@ export default function PostView() {
         {post.content}
       </div>
 
-      {/* 🔹 이미지 영역 (모자이크/원본/처리중 상태 포함) */}
-      <div style={{ marginTop: 16 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <strong>이미지</strong>
-          {!hasProcessed && !!attachments.length && (
-            <span
-              style={{
-                fontSize: 12,
-                padding: "2px 8px",
-                borderRadius: 12,
-                background: "#f97316",
-                color: "#fff",
-              }}
-            >
-              처리 중 (원본 미리보기)
-            </span>
-          )}
-        </div>
-
-        {activeImage ? (
-          <div style={{ marginTop: 12 }}>
-            <div
-              style={{
-                width: "100%",
-                maxWidth: 960,
-                borderRadius: 16,
-                overflow: "hidden",
-                border: "1px solid #e5e7eb",
-                background: "#0f172a",
-              }}
-            >
-              <img
-                src={activeImage.imageUrl}
-                alt="게시 이미지"
-                style={{
-                  width: "100%",
-                  minHeight: 320,
-                  maxHeight: 640,
-                  objectFit: "contain",
-                  display: "block",
-                  background: "#0f172a",
-                }}
-                onError={(e) => {
-                  e.currentTarget.src =
-                    "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23232a3b'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%237884ab' font-size='20'%3E이미지를 불러올 수 없습니다%3C/text%3E%3C/svg%3E";
-                }}
-              />
-            </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
-              {activeImage.createdAt
-                ? new Date(activeImage.createdAt).toLocaleString()
-                : ""}
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginTop: 12, color: "#94a3b8" }}>
-            표시할 이미지가 없습니다.
-          </div>
-        )}
-
-        {gallerySources.length > 1 && (
+      {/* 🔹 모자이크 이미지 표시 */}
+      {!!images.length && (
+        <div style={{ marginTop: 16 }}>
+          <strong>모자이크 이미지</strong>
           <div
             style={{
               display: "flex",
-              gap: 8,
               flexWrap: "wrap",
-              marginTop: 12,
+              gap: 12,
+              marginTop: 8,
             }}
           >
-            {gallerySources.map((img) => (
-              <button
-                key={img.imageId || img.imageUrl}
-                onClick={() => setSelectedImageId(img.imageId || img.imageUrl)}
-                style={{
-                  border:
-                    activeImage &&
-                    (activeImage.imageId === img.imageId ||
-                      activeImage.imageUrl === img.imageUrl)
-                      ? "2px solid #0ea5e9"
-                      : "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  padding: 0,
-                  background: "#0b1220",
-                  cursor: "pointer",
-                }}
-              >
+            {images.map((img) => (
+              <div key={img.imageId} style={{ maxWidth: 260 }}>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                  variant: {img.variant}
+                </div>
                 <img
                   src={img.imageUrl}
-                  alt="이미지 썸네일"
-                  style={{ width: 120, height: 80, objectFit: "cover", display: "block", borderRadius: 7 }}
-                  loading="lazy"
+                  alt={img.variant}
+                  style={{
+                    width: "100%",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    marginTop: 4,
+                  }}
                 />
-              </button>
+              </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* 🔹 기존 attachments 링크 표시는 숨김 (이미지 갤러리로만 노출) */}
+      {/* 🔹 기존 attachments 표시 */}
+      {!!attachments.length && (
+        <div style={{ marginTop: 16 }}>
+          <strong>첨부파일</strong>
+          <ul>
+            {attachments.map((u, idx) => (
+              <li key={idx}>
+                <a href={u} target="_blank" rel="noreferrer">
+                  {u}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* 하단 버튼 */}
       <div className="form-actions" style={{ marginTop: 24 }}>
