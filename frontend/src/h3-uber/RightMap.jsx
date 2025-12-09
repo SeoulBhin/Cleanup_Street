@@ -1,10 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
+  Polygon,
+} from "react-leaflet";
 import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
 import L from "leaflet";
+import { geoToH3, h3ToGeoBoundary } from "h3-js";
+
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+
 import marker2x from "leaflet/dist/images/marker-icon-2x.png";
 import marker1x from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -34,6 +44,7 @@ export default function RightMap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 지도 데이터 로딩
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -56,6 +67,7 @@ export default function RightMap() {
     };
   }, []);
 
+  // bounds 계산
   const bounds = useMemo(() => {
     return items
       .map((item) => {
@@ -66,7 +78,7 @@ export default function RightMap() {
       .filter(Boolean);
   }, [items]);
 
-  const center = bounds[0] || [37.5665, 126.978];
+  const center = bounds[0] || [37.5665, 126.978]; // 서울 시청 기준
 
   return (
     <div className="map-section">
@@ -97,30 +109,58 @@ export default function RightMap() {
               const lat = parseFloat(item.lat);
               const lng = parseFloat(item.lng);
               if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
               const imageUrl = item.image_url || FALLBACK_IMAGE;
+
+              // 📌 1) 핀 위치의 H3 인덱스 계산 (resolution 9: 도시 기준으로 적당히 작은 크기)
+              const h3Index = geoToH3(lat, lng, 9);
+
+              // 📌 2) H3 육각형 boundary → Leaflet Polygon 좌표로 변환
+              const hexBoundary = h3ToGeoBoundary(h3Index, true).map(
+                ([hLat, hLng]) => [hLat, hLng]
+              );
+
               return (
-                <Marker position={[lat, lng]} key={`${item.id}-${item.image_variant || "N"}`}>
-                  <Popup>
-                    <div className="map-popup">
-                      <div className="map-popup-thumb">
-                        <img
-                          src={imageUrl}
-                          alt={item.title || "신고 이미지"}
-                          loading="lazy"
-                        />
+                <React.Fragment
+                  key={`${item.id}-${item.image_variant || "N"}`}
+                >
+                  {/* 🔶 우버 H3 육각형: 연한 초록색, 작게/연하게 표시 */}
+                  <Polygon
+                    positions={hexBoundary}
+                    pathOptions={{
+                      color: "#20b820", // 테두리 초록
+                      weight: 1, // 얇게
+                      fillColor: "#20c420",
+                      fillOpacity: 0.25, // 연하게
+                    }}
+                  />
+
+                  {/* 📍 기존 마커 */}
+                  <Marker position={[lat, lng]}>
+                    <Popup>
+                      <div className="map-popup">
+                        <div className="map-popup-thumb">
+                          <img
+                            src={imageUrl}
+                            alt={item.title || "신고 이미지"}
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="map-popup-body">
+                          <h3>{item.title || "제목 없음"}</h3>
+                          <p className="map-popup-meta">
+                            위도: {lat.toFixed(6)}, 경도: {lng.toFixed(6)}
+                          </p>
+                          <p className="map-popup-desc">
+                            {item.content
+                              ? item.content.substring(0, 120)
+                              : "내용 없음"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="map-popup-body">
-                        <h3>{item.title || "제목 없음"}</h3>
-                        <p className="map-popup-meta">
-                          위도: {lat.toFixed(6)}, 경도: {lng.toFixed(6)}
-                        </p>
-                        <p className="map-popup-desc">
-                          {item.content ? item.content.substring(0, 120) : "내용 없음"}
-                        </p>
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
+                    </Popup>
+                  </Marker>
+                </React.Fragment>
               );
             })}
           </MarkerClusterGroup>
