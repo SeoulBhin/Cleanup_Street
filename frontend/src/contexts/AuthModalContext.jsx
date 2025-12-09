@@ -1,5 +1,3 @@
-// src/contexts/AuthModalContext.js (오류 수정 완료)
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const AuthModalContext = createContext(null);
@@ -25,7 +23,6 @@ export function AuthModalProvider({ children }) {
 
     const openSignupModal = useCallback(() => {
         setIsLoginModalOpen(false);
-        // 🚨 오타 수정 완료
         setIsSignupModalOpen(true); 
     }, []);
     
@@ -62,4 +59,5 @@ export function AuthModalProvider({ children }) {
             {children}
         </AuthModalContext.Provider>
     );
+
 }
