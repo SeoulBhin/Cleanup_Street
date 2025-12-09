@@ -114,7 +114,7 @@ export default function RightMap() {
             const h3Index = latLngToCell(lat, lng, 9);
 
             // 육각형 꼭짓점 좌표 → Leaflet Polygon 좌표로 변환
-            const hexBoundary = cellToBoundary(h3Index, true).map(
+            const hexBoundary = cellToBoundary(h3Index).map(
               ([hLat, hLng]) => [hLat, hLng] // Leaflet은 [lat, lng]
             );
 
