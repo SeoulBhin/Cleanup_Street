@@ -1,12 +1,12 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-// Context 및 Modals import
+//Context 및 Modals import
 import { AuthModalProvider, useAuthModal } from "./contexts/AuthModalContext"; 
 import LoginModal from "./front/LoginModal";
 import SignupModal from "./front/SignupModal";
 
-// 기존 컴포넌트 import 
+// 기존 컴포넌트 import (Header는 Layout 안에 있다고 가정)
 import Layout from "./front/Layout"; 
 import HomePage from "./front/HomePage";
 import IntroPage from "./front/IntroPage";
@@ -68,7 +68,7 @@ function AppRoutes() {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             
-            {/*2. 모달 컴포넌트를 라우트 외부에 렌더링 */}
+            {/* 2. 모달 컴포넌트를 라우트 외부에 렌더링 */}
             <GlobalModals />
         </Router>
     );
