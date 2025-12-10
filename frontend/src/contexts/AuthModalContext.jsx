@@ -2,7 +2,13 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const AuthModalContext = createContext(null);
 
-export const useAuthModal = () => useContext(AuthModalContext);
+export const useAuthModal = () => {
+    const context = useContext(AuthModalContext);
+    if (context === null) {
+        throw new Error('useAuthModal must be used within an AuthModalProvider');
+    }
+    return context;
+};
 
 export function AuthModalProvider({ children }) {
     // 1. 로그인/사용자 상태
@@ -23,6 +29,7 @@ export function AuthModalProvider({ children }) {
 
     const openSignupModal = useCallback(() => {
         setIsLoginModalOpen(false);
+        // 오타 수정 완료
         setIsSignupModalOpen(true); 
     }, []);
     
@@ -60,4 +67,3 @@ export function AuthModalProvider({ children }) {
         </AuthModalContext.Provider>
     );
 }
-
