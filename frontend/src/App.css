@@ -108,6 +108,99 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
  box-shadow: 0 0 0 2px #facc15;
 }
 
+
+/* ===================================================================================
+   Map Section
+   =================================================================================== */
+.home-map-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.map-section {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+}
+
+.map-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.map-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.map-subtext {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.map-status {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.map-status.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.map-container {
+  height: 520px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.map-popup {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 0.75rem;
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.map-popup-thumb img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.map-popup-body h3 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.map-popup-meta {
+  margin: 0 0 0.25rem 0;
+  color: #4b5563;
+  font-size: 0.85rem;
+}
+
+.map-popup-desc {
+  margin: 0;
+  color: #1f2937;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .nav-list {
  display: flex;
  gap: 2rem;
@@ -546,8 +639,10 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     gap: 0.5rem;
 }
 
-/* Responsive Design (Media Queries)
-   */
+/* ===================================================================================
+   Responsive Design (Media Queries)
+   =================================================================================== */
+
 /* 태블릿 사이즈 (Tablet) */
 @media (max-width: 1024px) {
  .gallery-grid {
@@ -781,8 +876,10 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
 .text-link:hover {
   text-decoration: underline;
 }
-/*  Modal Styles (하단 링크 섹션에 추가)
-   */
+/* ===================================================================================
+    Modal Styles (하단 링크 섹션에 추가)
+    =================================================================================== */
+
 .modal-footer-links a,
 .modal-footer-links button.link-as-button { /* <button>에 대한 스타일 추가/확장 */
     background: none; /* 버튼 배경 제거 */
@@ -804,6 +901,9 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     text-decoration: underline;
 }
 /*채팅방 CSS */
+/* ===================================================================================
+   Chat Component Styles
+   =================================================================================== */
 
 /* 전체 컨테이너 및 제목 */
 .chat-page-container {
@@ -936,41 +1036,4 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     font-weight: 600;
     white-space: nowrap;
     height: 40px;
-}
-
-/* Report Modal Specific Styles */
-.form-report {
-    gap: 1.25rem; /* 폼 그룹 간격 확장 */
-}
-
-.report-info-section {
-    padding: 1rem;
-    background-color: #f7f9fb;
-    border: 1px solid #e0e0e0;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-}
-.report-info-section strong {
-    color: #4b5563;
-    font-size: 0.95rem;
-}
-.post-title-highlight {
-    font-weight: 700;
-    color: #2c3e50;
-    margin-top: 0.25rem;
-    word-break: break-word;
-}
-
-/* 신고 사유 선택 버튼 레이아웃 */
-.report-reasons-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr); /* 두 열로 분할 */
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-@media (max-width: 480px) {
-    .report-reasons-grid {
-        grid-template-columns: 1fr; /* 모바일에서는 한 열 */
-    }
 }
