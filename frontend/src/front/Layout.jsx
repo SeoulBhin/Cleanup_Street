@@ -1,8 +1,8 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header'; 
-import Footer from './Footer'; // Footer 컴포넌트 가정
-import Navigation from './Navigation'; // Navigation 컴포넌트 가정
+import Footer from './Footer';
+import Navigation from './Navigation';
 
 export default function Layout() { 
     return (
