@@ -1,8 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Header from "./Header";
 import Navbar from "./Navbar";
-import SignupModal from "./SignupModal";
 import "../App.css";
 
 export default function Layout() {
