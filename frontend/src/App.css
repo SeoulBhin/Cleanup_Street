@@ -821,9 +821,12 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
 .btn-social:hover {
     filter: brightness(0.95);
 }
-
-/* 소셜 버튼별 색상 */
-/* 아이콘을 위한 공간 확보 및 정렬 */
+/* 카카오 버튼 스타일 */
+.btn-kakao {
+  background-color: #fee500;
+  color: #3c1e1e; /* 짙은 갈색 텍스트 */
+  border: 1px solid #fee500;
+ /* 소셜 버튼별 색상 */
   display: flex;
   align-items: center;
   justify-content: center; /* 텍스트만 있다면 중앙 정렬 */
