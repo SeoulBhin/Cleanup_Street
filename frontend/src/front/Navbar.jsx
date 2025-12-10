@@ -5,7 +5,7 @@ export default function Navbar() {
     { to: "/intro", label: "소개" },
     { to: "/announcements", label: "공지사항" },
     { to: "/board/free", label: "일반 게시판" },
-    { to: "/gallery", label: "활동 갤러리" },
+    { to: "/gallery", label: "활동 채팅방" },
   ];
 
   return (
