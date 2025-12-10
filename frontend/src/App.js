@@ -1,12 +1,12 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-//Context 및 Modals import
+// Context 및 Modals import (경로 확인 필수)
 import { AuthModalProvider, useAuthModal } from "./contexts/AuthModalContext"; 
 import LoginModal from "./front/LoginModal";
 import SignupModal from "./front/SignupModal";
 
-// 기존 컴포넌트 import (Header는 Layout 안에 있다고 가정)
+// 페이지 및 레이아웃 컴포넌트 import (경로 확인 필수)
 import Layout from "./front/Layout"; 
 import HomePage from "./front/HomePage";
 import IntroPage from "./front/IntroPage";
@@ -14,11 +14,11 @@ import AnnouncementsPage from "./front/AnnouncementsPage";
 import GalleryPage from "./front/GalleryPage";
 import BoardList from "./board/BoardList";
 import PostForm from "./board/PostForm";
-import PostView from "./board/PostView";
+import PostView from "./board/PostView"; 
 import Chat from "./chatting/Chat";
 
 
-//1. 모달 렌더링 전용 컴포넌트
+// 모달 렌더링 전용 컴포넌트: Context의 상태에 따라 전역적으로 모달을 표시
 const GlobalModals = () => {
     const { 
         isLoginModalOpen, isSignupModalOpen, 
@@ -51,6 +51,7 @@ function AppRoutes() {
     return (
         <Router>
             <Routes>
+                {/* Layout 내부에 Header가 있고, Provider 내부에서 렌더링됩니다. */}
                 <Route element={<Layout />}> 
                     <Route path="/" element={<HomePage />} />
                     <Route path="/intro" element={<IntroPage />} />
@@ -68,7 +69,6 @@ function AppRoutes() {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             
-            {/* 2. 모달 컴포넌트를 라우트 외부에 렌더링 */}
             <GlobalModals />
         </Router>
     );
