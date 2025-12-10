@@ -27,19 +27,14 @@ export default function SignupModal({ onClose, openLoginModal }) {
         </div>
 
         <div className="form-container" style={{ maxWidth: 'unset', margin: '0' }}>
-            
-            <p className="signup-instruction">
-                <span className="highlight"></span>10초 만에 시작하기
-            </p>
+              
+              <p className="signup-instruction">
+                  <span className="highlight">
+                    <center>10초 만에 가입하기</center></span>
+              </p>
 
             {/* 소셜 회원가입 버튼 그룹 */}
             <div className="social-login-group">
-                <button 
-                    className="btn-social btn-google" 
-                    onClick={() => handleSocialSignup('Google')}
-                >
-                    Google로 시작하기
-                </button>
                 <button 
                     className="btn-social btn-kakao" 
                     onClick={() => handleSocialSignup('Kakao')}
