@@ -1,4 +1,3 @@
-// src/components/LoginModal.jsx (또는 네가 둔 위치)
 import React from "react";
 import { apiBase } from "../api/http";   // ⬅️ 추가: 서버 베이스 URL
 
@@ -41,12 +40,6 @@ export default function LoginModal({ onClose, openSignupModal }) {
         </div>
 
         <div className="social-login-group">
-          <button
-            className="btn-social btn-google"
-            onClick={() => handleSocialLogin("Google")}
-          >
-            Google로 시작하기
-          </button>
           <button
             className="btn-social btn-kakao"
             onClick={() => handleSocialLogin("Kakao")}
