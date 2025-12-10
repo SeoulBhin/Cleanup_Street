@@ -6,9 +6,10 @@ export default function Navigation() {
     const navItems = [
         { path: "/", name: "홈" },
         { path: "/intro", name: "서비스 소개" },
-        { path: "/gallery", name: "채팅 갤러리" },
         { path: "/board/notice", name: "공지사항" },
-        { path: "/board/free", name: "자유게시판" }
+        { path: "/board/free", name: "자유게시판" },
+        { path: "/gallery", name: "이야기방" }
+        
     ];
 
     return (
