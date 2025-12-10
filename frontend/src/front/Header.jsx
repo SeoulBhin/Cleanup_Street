@@ -1,5 +1,6 @@
 import React from 'react';
-import { useAuthModal } from '../contexts/AuthModalContext';
+import { useAuthModal } from '../contexts/AuthModalContext'; 
+
 export default function Header({ onLogoClick }) {
     const { 
         isLoggedIn, 
@@ -13,7 +14,6 @@ export default function Header({ onLogoClick }) {
     // 로그인 전 UI (폼 + 로그인/회원가입 버튼)
     const LoggedOutView = () => (
         <>
-            
             <button className="btn btn-login" onClick={openLoginModal}>
                 로그인
             </button>
