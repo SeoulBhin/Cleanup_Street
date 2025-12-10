@@ -9,7 +9,7 @@ export default function Layout() {
         <div className="app-container">
             {/* Header는 Provider의 범위 내에 있습니다. */}
             <Header onLogoClick={() => window.location.href = '/'}/>
-            <Navigation /> 
+            <Navbar /> 
 
             <main className="main-content">
                 <div className="content-wrapper">
