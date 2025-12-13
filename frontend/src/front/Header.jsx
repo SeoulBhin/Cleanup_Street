@@ -8,7 +8,7 @@ export default function Header({ onLogoClick }) {
     if (!context) {
         return (
             <header className="app-header">
-                <h1>와챠우우우! (Watch out!)</h1>
+                <h1>와챠우! (Watch out!)</h1>
                 <div className="login-section">인증 시스템 로딩 중...</div>
             </header>
         );
