@@ -8,7 +8,7 @@ import LoginModal from "./front/LoginModal";
 import SignupModal from "./front/SignupModal";
 import OAuthCallback from "./front/callback";
 // 페이지 및 레이아웃 컴포넌트 import (경로 확인 필수)
-import Layout from "./front/layout"; 
+import Layout from "./front/Layout"; 
 import HomePage from "./front/HomePage";
 import IntroPage from "./front/IntroPage";
 import AnnouncementsPage from "./front/AnnouncementsPage";
