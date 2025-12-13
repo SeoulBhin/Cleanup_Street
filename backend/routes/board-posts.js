@@ -1,4 +1,90 @@
 // backend/routes/board-posts.js
+
+// =========================
+// KoBERT 호출 (자동 분류)
+// =========================
+
+// ✅ fetch 안전 래퍼: Node 18+는 global fetch 사용, 아니면 node-fetch를 동적 로드
+async function fetchCompat(url, options) {
+  if (typeof fetch === "function") {
+    return fetch(url, options);
+  }
+  // ⚠️ node-fetch 설치가 필요할 수 있음: npm i node-fetch
+  // ⚠️ node-fetch 버전에 따라 require가 깨질 수 있어서 import() 방식 사용
+  const mod = await import("node-fetch");
+  const f = mod.default || mod;
+  return f(url, options);
+}
+
+const KOBERT_URL = process.env.KOBERT_URL;           // 없으면 undefined
+const KOBERT_ENABLED = !!process.env.KOBERT_URL;     // URL 있을 때만 ON
+
+const ALLOWED_CATEGORIES = new Set([
+  "도로-교통",
+  "시설물-건축",
+  "치안-범죄위험",
+  "자연재난-환경",
+  "위생-보건",
+  "기타",
+  "스팸",
+]);
+
+function normalizeCategory(raw) {
+  if (!raw || typeof raw !== "string") return null;
+
+  let s = raw.trim();
+  s = s.replace(/\s+/g, ""); // 공백 제거
+  s = s.replace(/[·ㆍ]/g, "-"); // 중점류 → -
+  s = s.replace(/_/g, "-");
+
+  // 흔한 흔들림 보정
+  if (s === "자연-재난환경") s = "자연재난-환경";
+  if (s === "자연재난환경") s = "자연재난-환경";
+
+  // 예: "치안·범죄위험" -> 위에서 "-"로 바뀌지만 혹시 누락 대비
+  if (s === "치안-범죄위험") s = "치안-범죄위험";
+
+  return s;
+}
+
+async function classifyByKoBERT(text) {
+  if (!KOBERT_ENABLED) return null; // ✅ 팀 환경/배포에서 KoBERT 호출 자체를 안 함
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 10000);
+
+  try {
+    const res = await fetchCompat(KOBERT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: ac.signal,
+    });
+
+    if (!res.ok) throw new Error(`KoBERT ${res.status}`);
+
+    const data = await res.json();
+
+    // ⚠️ 응답 필드명은 서버 구현에 따라 다를 수 있음(확실하지 않음)
+    const picked =
+      data?.category ||
+      data?.label ||
+      data?.result?.category ||
+      data?.result?.label ||
+      null;
+
+    const norm = normalizeCategory(picked);
+    if (!norm) return null;
+
+    return ALLOWED_CATEGORIES.has(norm) ? norm : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// =========================
+// 기존 라우터
+// =========================
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
@@ -75,7 +161,6 @@ function enrichImages(row) {
     if (!existing.has(url)) fallbackUrls.push(url);
   }
 
-  // uploads 경로만 적힌 경우도 처리 (절대 URL로 오는 케이스 우선)
   const uploadsRegex = /(\/uploads\/\S+\.(?:jpg|jpeg|png|gif|webp))/gi;
   while ((match = uploadsRegex.exec(content)) !== null) {
     const url = match[1];
@@ -111,17 +196,18 @@ function enrichImages(row) {
 
 /**
  * 주소 처리 공통 함수
- * - latitude/longitude 가 이미 있으면 그걸 우선 사용
- * - 없고 address 가 있으면 카카오 지오코딩으로 lat/lng 계산
- * - 지오코딩 실패 시 { error: {status, body} }
  */
 async function resolveLocation({ latitude, longitude, address }) {
   let lat = null;
   let lng = null;
   let normalizedAddress = (address || "").trim() || null;
 
-  // 1) 클라이언트가 lat/lng 직접 준 경우
-  if (latitude != null && longitude != null && latitude !== "" && longitude !== "") {
+  if (
+    latitude != null &&
+    longitude != null &&
+    latitude !== "" &&
+    longitude !== ""
+  ) {
     lat = Number(latitude);
     lng = Number(longitude);
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -138,18 +224,12 @@ async function resolveLocation({ latitude, longitude, address }) {
     return { lat, lng, address: normalizedAddress };
   }
 
- // 🔥 여기부터가 수정 포인트
-  // 2) 좌표는 없고 address 텍스트만 존재하는 경우 → 카카오 지오코딩
   if (normalizedAddress) {
-    // ✅ 2-1. 주소 문자열 정리
-    // - 앞쪽 5자리 우편번호 제거
-    // - 괄호로 들어가는 동 정보 "(침산동)" 같은 것 제거
     const cleaned = normalizedAddress
-      .replace(/^\d{5}\s*/, "")  // "41590 " 제거
-      .replace(/\(.*$/, "")      // "(침산동)" 이런 거 제거
+      .replace(/^\d{5}\s*/, "")
+      .replace(/\(.*$/, "")
       .trim();
 
-    // ✅ 2-2. 정리된 주소로 지오코딩
     const geo = await geocodeAddress(cleaned);
     if (!geo) {
       return {
@@ -166,11 +246,10 @@ async function resolveLocation({ latitude, longitude, address }) {
     return {
       lat: geo.lat,
       lng: geo.lng,
-      address: geo.normalizedAddress || cleaned,  // 정리된 주소 저장
+      address: geo.normalizedAddress || cleaned,
     };
   }
 
-  // 3) 주소/좌표 둘 다 없는 경우 → 위치 정보 없이 저장
   return { lat: null, lng: null, address: null };
 }
 
@@ -179,30 +258,23 @@ async function resolveLocation({ latitude, longitude, address }) {
  */
 function buildSpatialFields(lat, lng) {
   if (lat == null || lng == null) {
-    return {
-      h3_index: null,
-      location: null,
-    };
+    return { h3_index: null, location: null };
   }
 
-  // H3 index (hex 문자열 → BIGINT)
-  const hexIndex = latLngToCell(lat, lng, 10); // ex) "8a2a1072b59ffff"
+  const hexIndex = latLngToCell(lat, lng, 10);
   let h3_index = null;
   try {
-    h3_index = BigInt("0x" + hexIndex); // BIGINT 컬럼에 저장
+    h3_index = BigInt("0x" + hexIndex);
   } catch {
     h3_index = null;
   }
 
-  // PostGIS geography(Point, 4326)
   const location = `SRID=4326;POINT(${lng} ${lat})`;
-
   return { h3_index, location };
 }
 
 // ================================
 // 목록 조회  GET /api/board-posts
-//   ?boardType=free&q=검색어
 // ================================
 router.get("/", async (req, res, next) => {
   try {
@@ -212,7 +284,6 @@ router.get("/", async (req, res, next) => {
     let sql;
     let params;
 
-    // 1) 전체 탭(boardType === 'free' 또는 비어 있음) ➜ 카테고리 필터 없음
     if (!boardType || boardType === "free") {
       sql = `
         ${BASE_SELECT}
@@ -221,7 +292,6 @@ router.get("/", async (req, res, next) => {
       `;
       params = [search];
     } else {
-      // 2) 도로-교통, 치안-범죄위험 등 실제 카테고리일 때만 필터
       sql = `
         ${BASE_SELECT}
         WHERE p.category = $1
@@ -245,15 +315,11 @@ router.get("/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
-      // /api/board-posts/undefined 같은 경우 여기로 옴
       return res.status(400).json({ message: "BAD_POST_ID" });
     }
 
     const post = await fetchPostById(id);
-
-    if (!post) {
-      return res.status(404).json({ message: "Not Found" });
-    }
+    if (!post) return res.status(404).json({ message: "Not Found" });
 
     res.json(post);
   } catch (err) {
@@ -263,14 +329,15 @@ router.get("/:id", async (req, res, next) => {
 
 // ================================
 // 게시글 생성  POST /api/board-posts
-// body: { title, content, category, address?, latitude?, longitude?, attachments? }
 // ================================
 router.post("/", requireAuth, async (req, res, next) => {
   try {
     const {
       title,
       content,
+      postBody, // ✅ 호환: 팀원 프론트가 postBody로 보내는 경우
       category,
+      autoCategory = false, 
       address,
       latitude = null,
       longitude = null,
@@ -279,13 +346,32 @@ router.post("/", requireAuth, async (req, res, next) => {
       selectedVariant = "AUTO",
     } = req.body;
 
-    if (!title || !content) { // " || !category" << 이거 KoBert 자동분류 할거라서 삭제함 
+    // ✅ 최종 본문: content 우선, 없으면 postBody 사용
+    const finalContent = (content ?? postBody ?? "").toString();
+
+    if (!title || !finalContent) {
       return res
         .status(400)
         .json({ message: "필수 값 누락 (title / content)", code: "MISSING_FIELDS" });
     }
 
-    // 1) 주소/좌표 처리 (지오코딩 포함)
+    // ✅ 0) KoBERT 자동 분류
+    let finalCategory = category;
+
+    if ((autoCategory === true || !finalCategory) && KOBERT_ENABLED) {
+      try {
+        const predicted = await classifyByKoBERT(`${title}\n${finalContent}`);
+        finalCategory = predicted || finalCategory || "기타";
+      } catch (e) {
+        finalCategory = finalCategory || "기타";
+      }
+    } else {
+      const norm = normalizeCategory(finalCategory);
+      finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
+    }
+
+
+    // 1) 주소/좌표 처리
     const locResult = await resolveLocation({ latitude, longitude, address });
     if (locResult.error) {
       return res.status(locResult.error.status).json(locResult.error.body);
@@ -311,10 +397,10 @@ router.post("/", requireAuth, async (req, res, next) => {
     `;
 
     const { rows } = await db.query(insertQuery, [
-      req.user.user_id,           // 로그인한 유저
+      req.user.user_id,
       title,
-      content,
-      category,
+      finalContent, // ✅ 여기!
+      finalCategory,
       resolvedAddress,
       resolvedLat,
       resolvedLng,
@@ -324,7 +410,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const postId = rows[0].id;
 
-    // 4) 🔥 미리보기(previewId)가 있으면 모자이크 이미지 1장 붙이기
+    // 4) 미리보기(previewId) → 모자이크 이미지 1장 저장
     if (previewId) {
       try {
         const { rows: previewRows } = await db.query(
@@ -345,7 +431,6 @@ router.post("/", requireAuth, async (req, res, next) => {
               ? preview.plate_visible_image
               : preview.auto_mosaic_image;
 
-          // post_images 테이블에 실제 게시글 이미지로 저장
           await db.query(
             `
             INSERT INTO post_images (post_id, image_url, variant)
@@ -354,19 +439,17 @@ router.post("/", requireAuth, async (req, res, next) => {
             [postId, imageUrl, variant]
           );
 
-          // (선택) 해당 preview는 사용 완료 표시
           await db.query(
             `UPDATE image_previews SET is_used = true WHERE preview_id = $1`,
             [previewId]
           );
         }
       } catch (e) {
-        // 미리보기 연결 실패해도 글 작성 자체는 살려두고, 로그만 남김
         console.error("[POSTS] preview attach error:", e);
       }
     }
 
-    // 5) 추가 첨부(attachments)도 있으면 post_images에 저장
+    // 5) 추가 첨부(attachments)
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const params = [postId];
       const values = attachments.map((url, idx) => {
@@ -383,7 +466,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       );
     }
 
-    res.json({ id: postId });
+    res.json({ id: postId, category: finalCategory });
   } catch (err) {
     next(err);
   }
@@ -391,7 +474,6 @@ router.post("/", requireAuth, async (req, res, next) => {
 
 // ================================
 // 게시글 수정  PUT /api/board-posts/:id
-// body: { title, content, category, address?, latitude?, longitude?, attachments? }
 // ================================
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
@@ -399,6 +481,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
     const {
       title,
       content,
+      postBody, // ✅ 호환
       category,
       address,
       latitude = null,
@@ -406,22 +489,15 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       attachments = [],
     } = req.body;
 
-    if (!title || !content || !category) {
+    const finalContent = (content ?? postBody ?? "").toString();
+
+    // ✅ 수정은 기존 팀원 흐름 유지: category는 필수로 둠
+    if (!title || !finalContent || !category) {
       return res
         .status(400)
         .json({ message: "필수 값 누락 (title / content / category)", code: "MISSING_FIELDS" });
     }
 
-    // (선택) 소유권 체크 로직 추가 가능
-    // const { rows: ownerRows } = await db.query(
-    //   "SELECT user_id FROM posts WHERE post_id = $1",
-    //   [id]
-    // );
-    // if (!ownerRows.length || ownerRows[0].user_id !== req.user.user_id) {
-    //   return res.status(403).json({ message: "수정 권한이 없습니다." });
-    // }
-
-    // 1) 주소/좌표 처리 (지오코딩 포함)
     const locResult = await resolveLocation({ latitude, longitude, address });
     if (locResult.error) {
       return res.status(locResult.error.status).json(locResult.error.body);
@@ -430,10 +506,8 @@ router.put("/:id", requireAuth, async (req, res, next) => {
     const resolvedLng = locResult.lng;
     const resolvedAddress = locResult.address;
 
-    // 2) H3, location 계산
     const { h3_index, location } = buildSpatialFields(resolvedLat, resolvedLng);
 
-    // 3) posts UPDATE
     const updateQuery = `
       UPDATE posts
       SET
@@ -451,7 +525,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 
     await db.query(updateQuery, [
       title,
-      content,
+      finalContent, // ✅ 여기!
       category,
       resolvedAddress,
       resolvedLat,
@@ -461,7 +535,6 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       id,
     ]);
 
-    // 4) 첨부 이미지 갱신 (간단히: 기존 삭제 후 재삽입)
     await db.query(`DELETE FROM post_images WHERE post_id = $1`, [id]);
 
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
