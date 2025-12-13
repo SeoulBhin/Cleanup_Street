@@ -17,7 +17,7 @@ export function getBoardPost(boardType, id) {
 // ✅ 새 글 작성은 /api/posts 로 보내고, body 전체를 그대로 전달
 export function createBoardPost(boardType, body) {
   return postJSON(`/api/posts`, {
-    ...body,                             // 🔥 postBody 포함해서 전부 전달
+    ...body, // postBody 포함
     category: body.category,
   });
 }
@@ -33,23 +33,40 @@ export function updateBoardPost(boardType, id, body) {
 export function deleteBoardPost(boardType, id) {
   return del(`/api/board-posts/${id}`);
 }
-/* =========================
-   ✅ 댓글 API (서버 라우트 확정본)
-   GET  /api/posts/:postId/comments
-   POST /api/posts/:postId/comments   (requireAuth)
-========================= */
 
-// 댓글 목록
+/* =========================
+   ✅ 게시글 좋아요
+   POST /api/posts/:postId/like (requireAuth)
+========================= */
+export function addLike(boardType, postId) {
+  return postJSON(`/api/posts/${postId}/like`);
+}
+
+/* =========================
+   ✅ 댓글 API
+   GET  /api/posts/:postId/comments
+   POST /api/posts/:postId/comments (requireAuth)
+========================= */
 export function listReplies(boardType, postId) {
   return getJSON(`/api/posts/${postId}/comments`);
 }
 
-// 댓글 작성
 export function submitReply(boardType, postId, content) {
   return postJSON(`/api/posts/${postId}/comments`, { content });
 }
 
-// 게시글 좋아요 토글
-export function addLike(boardType, postId) {
-  return postJSON(`/api/posts/${postId}/like`);
+/* =========================
+   ✅ 댓글 좋아요
+   POST /api/comments/:id/like (requireAuth)
+========================= */
+export function addReplyLike(replyId) {
+  return postJSON(`/api/comments/${replyId}/like`);
+}
+
+/* =========================
+   ✅ 댓글 신고
+   (이 경로는 서버 라우터에 따라 달라질 수 있음)
+========================= */
+export function reportReply(replyId) {
+  return postJSON(`/api/report/comment/${replyId}`);
 }
