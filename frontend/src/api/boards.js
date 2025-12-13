@@ -70,3 +70,12 @@ export function addReplyLike(replyId) {
 export function reportReply(replyId) {
   return postJSON(`/api/report/comment/${replyId}`);
 }
+// 댓글 수정
+export function updateReply(replyId, content) {
+  return putJSON(`/api/comments/${replyId}`, { content });
+}
+
+// 댓글 삭제
+export function deleteReply(replyId) {
+  return del(`/api/comments/${replyId}`);
+}
