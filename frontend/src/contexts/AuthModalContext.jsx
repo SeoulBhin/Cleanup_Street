@@ -23,30 +23,43 @@ export function AuthModalProvider({ children }) {
   }, []);
 
   const closeLoginModal = useCallback(() => setIsLoginModalOpen(false), []);
-
   const openSignupModal = useCallback(() => {
     setIsLoginModalOpen(false);
     setIsSignupModalOpen(true);
   }, []);
-
   const closeSignupModal = useCallback(() => setIsSignupModalOpen(false), []);
 
-  // ✅ 앱 시작 시 토큰 있으면 로그인 상태 복구
+  // ✅ 앱 시작 시 로그인 복구: token + userInfo
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
+    const storedUser = localStorage.getItem("userInfo");
+
     if (token) {
       setIsLoggedIn(true);
-      // userInfo 복구는 /me 호출이 베스트지만 일단 true만 켜도 Header는 바뀜
+      if (storedUser) {
+        try {
+          setUserInfo(JSON.parse(storedUser));
+        } catch {
+          setUserInfo(null);
+        }
+      }
     }
   }, []);
 
-  // ✅ 로그인 성공 처리: 토큰 저장 + 상태 반영
+  // ✅ 로그인 성공 처리: 토큰 + 유저 저장
   const handleLoginSuccess = useCallback(
     (data) => {
       if (data?.token) {
         localStorage.setItem("accessToken", data.token);
       }
-      setUserInfo(data?.user ?? data ?? null);
+      if (data?.user) {
+        setUserInfo(data.user);
+        localStorage.setItem("userInfo", JSON.stringify(data.user)); // ✅ 추가
+      } else {
+        setUserInfo(null);
+        localStorage.removeItem("userInfo");
+      }
+
       setIsLoggedIn(true);
       closeLoginModal();
     },
@@ -55,7 +68,8 @@ export function AuthModalProvider({ children }) {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("token"); 
+    localStorage.removeItem("userInfo"); // ✅ 추가
+    localStorage.removeItem("token");    // (기존 잔재 호환용) 있어도 무방
     setIsLoggedIn(false);
     setUserInfo(null);
     alert("로그아웃 되었습니다.");
@@ -76,3 +90,4 @@ export function AuthModalProvider({ children }) {
 
   return <AuthModalContext.Provider value={value}>{children}</AuthModalContext.Provider>;
 }
+//
