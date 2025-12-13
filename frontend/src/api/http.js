@@ -2,7 +2,7 @@ export const apiBase = process.env.REACT_APP_API_BASE_URL || "";
 
 // 공통 fetch 함수
 async function request(path, opts = {}) {
-  const token = localStorage.getItem("accesstoken"); // JWT 저장 위치 맞춰야 함
+  const token = localStorage.getItem("accessToken"); // JWT 저장 위치 맞춰야 함
 
   const res = await fetch(apiBase + path, {
     credentials: "include",
