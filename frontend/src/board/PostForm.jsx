@@ -190,7 +190,7 @@ export default function PostForm() {
           />
         </div>
 
-        {/* 카테고리 (수정 화면에서만 의미 있음 / 새 글에는 실제로는 사용 안 함) */}
+        {/* 카테고리 (수정 화면에서만 의미 있음 / 새 글에는 실제로는 사용 안 함)
         <div className="form-group">
           <label>카테고리</label>
           <select
@@ -205,7 +205,7 @@ export default function PostForm() {
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
 
         {/* 주소 + 검색 버튼 */}
         <div className="form-group">
