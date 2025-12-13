@@ -14,19 +14,21 @@ export function getBoardPost(boardType, id) {
   return getJSON(`/api/board-posts/${id}`);
 }
 
-// ✅ 새 글 작성은 /api/posts 로 보내고, body 전체를 그대로 전달
+// ✅ 새 글 작성: userId/user_id 같은 필드는 프론트에서 보내지 않음 (서버가 토큰으로 결정)
 export function createBoardPost(boardType, body) {
+  const { userId, user_id, ...safeBody } = body || {};
   return postJSON(`/api/board-posts`, {
-    ...body,
-    category: body.category,
+    ...safeBody,
+    category: safeBody.category,
   });
 }
 
-// 수정은 아직 board-posts 에 맡겨둔다면 이대로 두면 됨
+// ✅ 수정도 마찬가지로 userId 계열 제거 (안전장치)
 export function updateBoardPost(boardType, id, body) {
+  const { userId, user_id, ...safeBody } = body || {};
   return putJSON(`/api/board-posts/${id}`, {
-    ...body,
-    category: boardType || body.category,
+    ...safeBody,
+    category: boardType || safeBody.category,
   });
 }
 
@@ -65,13 +67,13 @@ export function addReplyLike(replyId) {
 
 /* =========================
    ✅ 댓글 신고
-   (이 경로는 서버 라우터에 따라 달라질 수 있음)
 ========================= */
 export function reportReply(replyId, reason) {
   return postJSON(`/api/report/comment/${replyId}`, {
     reason, // ✅ 서버가 기대하는 필드명
   });
 }
+
 // 댓글 수정
 export function updateReply(replyId, content) {
   return putJSON(`/api/comments/${replyId}`, { content });

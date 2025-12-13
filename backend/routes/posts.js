@@ -7,12 +7,13 @@ const h3 = require("h3-js");
 const path = require("path");
 const fs = require("fs/promises");
 const crypto = require("crypto");
+const { requireAuth } = require("../middlewares/auth"); 
 
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 
 function resolveUploadPath(url) {
   if (!url || typeof url !== "string") return null;
-  // data URI나 http(s):// 이 아닌 경우 스킵
+  // data URI나 http(s):// 이 아닌 경우 스킵`
   const uploadsIdx = url.indexOf("/uploads/");
   if (uploadsIdx === -1) return null;
   const filename = url.slice(uploadsIdx + "/uploads/".length).split(/[?#]/)[0];
@@ -194,9 +195,9 @@ router.get("/:postId", async (req, res) => {
 
 // ================== 새 글 작성 (주소 + 지도/H3 포함) ==================
 
-router.post("/", async (req, res) => {
++router.post("/", requireAuth, async (req, res) => {
   // JWT 안 쓰는 모자이크 파이프라인이라 일단 기본값 1
-  const userId = req.body.userId || 1;
+  const userId = req.user.id;
 
   const {
     title,
@@ -347,7 +348,7 @@ router.post("/", async (req, res) => {
 
 // ================== 글 수정 (주소 + 지도/H3 포함) ==================
 
-router.put("/:postId", async (req, res) => {
+router.put("/:postId", requireAuth, async (req, res) => {
   const { postId } = req.params;
 
   const {
@@ -366,6 +367,13 @@ router.put("/:postId", async (req, res) => {
   }
 
   try {
+    const existing = await fetchPostById(postId);
+    if (!existing) return res.status(404).json({ error: "Post not found" });
+
+    if (Number(existing.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ error: "FORBIDDEN", code: "NOT_AUTHOR" });
+    }
+
     let lat = latitude;
     let lng = longitude;
     let h3Idx = h3Index;
@@ -482,6 +490,33 @@ router.put("/:postId", async (req, res) => {
   } catch (err) {
     console.error("Failed to update post", err);
     res.status(500).json({ error: "Failed to update post" });
+  }
+});
+
+// ================== 글 삭제 ==================
+// ✅ 작성자만 삭제 가능
+router.delete("/:postId", requireAuth, async (req, res) => {
+  const { postId } = req.params;
+
+  try {
+    const existing = await fetchPostById(postId);
+    if (!existing) return res.status(404).json({ error: "Post not found" });
+
+    if (Number(existing.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ error: "FORBIDDEN", code: "NOT_AUTHOR" });
+    }
+
+    // (선택) 게시글에 연결된 이미지 파일 정리하고 싶으면 활성화
+    // const imgs = Array.isArray(existing.images) ? existing.images : [];
+    // await Promise.all(imgs.map((img) => deleteLocalUpload(img.imageUrl)));
+
+    await db.query("DELETE FROM post_images WHERE post_id = $1", [postId]);
+    await db.query("DELETE FROM posts WHERE post_id = $1", [postId]);
+
+    return res.status(204).send();
+  } catch (err) {
+    console.error("Failed to delete post", err);
+    return res.status(500).json({ error: "Failed to delete post" });
   }
 });
 
