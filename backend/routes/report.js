@@ -33,7 +33,7 @@ router.post('/posts/:id', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/comments/:id', requireAuth, async (req, res) => {
+router.post('/comment/:id', requireAuth, async (req, res) => {
   const commentId = toId(req.params.id);
   const { reason } = req.body;
   const userId = req.user?.userId;
