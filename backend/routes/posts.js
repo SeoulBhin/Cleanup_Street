@@ -195,7 +195,7 @@ router.get("/:postId", async (req, res) => {
 
 // ================== 새 글 작성 (주소 + 지도/H3 포함) ==================
 
-+router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   // JWT 안 쓰는 모자이크 파이프라인이라 일단 기본값 1
   const userId = req.user.id;
 
