@@ -28,6 +28,8 @@ router.get('/login', (req, res) => {
   authURL.searchParams.set('state', state);
   authURL.searchParams.set('scope', 'profile_nickname profile_image');
 
+  authURL.searchParams.set('prompt', 'login');
+
   res.redirect(authURL.toString());
 });
 
