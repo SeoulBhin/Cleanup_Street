@@ -1,8 +1,15 @@
 // src/components/PostView.jsx
-
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getBoardPost, deleteBoardPost } from "../api/boards";
+import {
+  getBoardPost,
+  deleteBoardPost,
+  addLike,        // ✅ 추가
+  listReplies,    // ✅ 추가 (GET /api/posts/:postId/comments)
+  submitReply,    // ✅ 추가 (POST /api/posts/:postId/comments)
+} from "../api/boards";
+
+import ReplyItem from "./ReplyItem";
 
 export default function PostView() {
   const { boardType, id } = useParams();
@@ -13,6 +20,11 @@ export default function PostView() {
   const [loadError, setLoadError] = useState(null);
   const [selectedImageId, setSelectedImageId] = useState(null);
 
+  // ✅ 좋아요/댓글 상태
+  const [isLiked, setIsLiked] = useState(false);
+  const [replies, setReplies] = useState([]);
+  const [newReplyText, setNewReplyText] = useState("");
+
   // 🔹 id가 정상적인 숫자인지 체크
   const isValidId =
     id !== undefined &&
@@ -21,33 +33,98 @@ export default function PostView() {
     !Number.isNaN(Number(id));
 
   // --------------------------
-  // 게시글 불러오기
+  // ✅ 게시글 + 댓글 같이 불러오기
   // --------------------------
-  useEffect(() => {
+  const fetchDetail = useCallback(async () => {
     if (!isValidId) {
       setLoading(false);
       setLoadError("BAD_ID");
       return;
     }
 
-    (async () => {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        const p = await getBoardPost(boardType, id);
-        setPost(p);
-        setSelectedImageId(null);
-      } catch (err) {
-        console.error("게시글 불러오기 실패:", err);
-        setLoadError("LOAD_FAIL");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    try {
+      setLoading(true);
+      setLoadError(null);
+
+      // 1) 게시글 불러오기 (기존)
+      const p = await getBoardPost(boardType, id);
+      setPost(p);
+      setSelectedImageId(null);
+
+      // ✅ 서버가 is_liked_by_me 내려주면 초기 좋아요 상태 세팅
+      setIsLiked(!!p?.is_liked_by_me);
+
+      // 2) 댓글 불러오기 (서버 확정 라우트)
+      const r = await listReplies(boardType, id);
+      setReplies(Array.isArray(r) ? r : []);
+    } catch (err) {
+      console.error("게시글/댓글 불러오기 실패:", err);
+      setLoadError("LOAD_FAIL");
+      setPost(null);
+      setReplies([]);
+    } finally {
+      setLoading(false);
+    }
   }, [boardType, id, isValidId]);
 
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
   // --------------------------
-  // 삭제 기능
+  // ✅ 게시글 좋아요 토글
+  // --------------------------
+  const handleLike = async () => {
+    if (!post) return;
+
+    const wasLiked = isLiked;
+    const delta = wasLiked ? -1 : 1;
+
+    // 낙관적 업데이트
+    setIsLiked(!wasLiked);
+    setPost((prev) =>
+      prev ? { ...prev, likes: (prev.likes || 0) + delta } : prev
+    );
+
+    try {
+      // 서버: POST /api/posts/:postId/like  → { liked: true/false }
+      const res = await addLike(boardType, id);
+      setIsLiked(!!res?.liked);
+    } catch (err) {
+      console.error("좋아요 실패:", err);
+
+      // 롤백
+      setIsLiked(wasLiked);
+      setPost((prev) =>
+        prev ? { ...prev, likes: (prev.likes || 0) - delta } : prev
+      );
+
+      if (err?.status === 401) alert("로그인이 필요합니다.");
+      else alert("좋아요 처리에 실패했습니다.");
+    }
+  };
+
+  // --------------------------
+  // ✅ 댓글 작성
+  // --------------------------
+  const handleReplySubmit = async (e) => {
+    e.preventDefault();
+    const text = newReplyText.trim();
+    if (!text) return;
+
+    try {
+      await submitReply(boardType, id, text); // body: { content: text }
+      setNewReplyText("");
+      await fetchDetail();
+    } catch (err) {
+      console.error("댓글 작성 실패:", err);
+      if (err?.status === 401) alert("로그인이 필요합니다.");
+      else alert("댓글 작성에 실패했습니다.");
+    }
+  };
+
+  // --------------------------
+  // 삭제 기능 (기존)
   // --------------------------
   const onDelete = async () => {
     if (!isValidId) return;
@@ -61,7 +138,7 @@ export default function PostView() {
   };
 
   // --------------------------
-  // 잘못된 ID 처리
+  // 잘못된 ID 처리 (기존)
   // --------------------------
   if (!isValidId) {
     return (
@@ -77,14 +154,10 @@ export default function PostView() {
   }
 
   // --------------------------
-  // 로딩 / 에러 화면
+  // 로딩 / 에러 화면 (기존)
   // --------------------------
   if (loading) {
-    return (
-      <div className="page-container">
-        불러오는 중...
-      </div>
-    );
+    return <div className="page-container">불러오는 중...</div>;
   }
 
   if (loadError && !post) {
@@ -103,50 +176,36 @@ export default function PostView() {
     );
   }
 
-  // --------------------------
-  // 실제 게시글 렌더링
-  // --------------------------
   if (!post) {
-    return (
-      <div className="page-container">
-        게시글 정보가 없습니다.
-      </div>
-    );
+    return <div className="page-container">게시글 정보가 없습니다.</div>;
   }
 
-  // 모자이크 이미지(posts.images)
+  // --------------------------
+  // ✅ (기존) 이미지 처리 로직 그대로
+  // --------------------------
   const images = Array.isArray(post.images) ? post.images : [];
   const attachments = Array.isArray(post.attachments) ? post.attachments : [];
 
-  // 콘텐츠 안에 포함된 이미지 URL 추출
   const extractImageUrls = (text) => {
     if (!text || typeof text !== "string") return [];
     const urls = [];
 
-    // 1) http/https 전체를 먼저 추출 (공백/개행 기준)
     const roughUrl = /(https?:\/\/\S+)/gi;
     let match;
-    while ((match = roughUrl.exec(text)) !== null) {
-      urls.push(match[1]);
-    }
+    while ((match = roughUrl.exec(text)) !== null) urls.push(match[1]);
 
-    // 2) /uploads/ 상대경로 추출
     const uploadsRegex = /(\/uploads\/\S+)/gi;
-    while ((match = uploadsRegex.exec(text)) !== null) {
-      urls.push(match[1]);
-    }
+    while ((match = uploadsRegex.exec(text)) !== null) urls.push(match[1]);
 
-    // 3) 확장자 필터 및 후행 특수문자 제거
     const cleaned = [];
     const seen = new Set();
     for (const url of urls) {
-      const stripped = url.replace(/[)>,\]]+$/, ""); // 뒤에 붙은 괄호/쉼표 제거
+      const stripped = url.replace(/[)>,\]]+$/, "");
       if (!/\.(jpg|jpeg|png|gif|webp)(\?|#|$)/i.test(stripped)) continue;
       if (seen.has(stripped)) continue;
       seen.add(stripped);
       cleaned.push(stripped);
     }
-
     return cleaned;
   };
 
@@ -159,7 +218,6 @@ export default function PostView() {
 
   const hasProcessed = normalizedImages.length > 0;
 
-  // attachments + content 내 이미지 URL도 썸네일로 포함 (중복 제거)
   const attachmentImages = [...attachments, ...contentImages].reduce(
     (acc, url) => {
       if (!url || acc.seen.has(url)) return acc;
@@ -174,9 +232,7 @@ export default function PostView() {
     { seen: new Set(), list: [] }
   ).list;
 
-  const gallerySources = hasProcessed
-    ? normalizedImages
-    : attachmentImages;
+  const gallerySources = hasProcessed ? normalizedImages : attachmentImages;
 
   const selected =
     gallerySources.find((img) => {
@@ -192,7 +248,6 @@ export default function PostView() {
   // --------------------------
   return (
     <div className="page-container fade-in">
-
       {/* 제목 */}
       <h2 className="page-title" style={{ border: "none", paddingBottom: 0 }}>
         {post.title}
@@ -205,11 +260,18 @@ export default function PostView() {
         </span>
         <span>작성자: {post.author || "익명"}</span> |{" "}
         <span>
-          작성일:{" "}
-          {post.created_at
-            ? new Date(post.created_at).toLocaleString()
-            : "-"}
+          작성일: {post.created_at ? new Date(post.created_at).toLocaleString() : "-"}
         </span>
+      </div>
+
+      {/* ✅ 좋아요 버튼 (추가) */}
+      <div className="post-actions-detail" style={{ marginBottom: 12 }}>
+        <button
+          className={`btn-action ${isLiked ? "active" : ""}`}
+          onClick={handleLike}
+        >
+          {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
+        </button>
       </div>
 
       {/* 내용 */}
@@ -217,16 +279,9 @@ export default function PostView() {
         {post.content}
       </div>
 
-      {/* 🔹 이미지 영역 (모자이크/원본/처리중 상태 포함) */}
+      {/* 이미지 영역 (기존) */}
       <div style={{ marginTop: 16 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong>이미지</strong>
           {!hasProcessed && !!attachments.length && (
             <span
@@ -273,26 +328,15 @@ export default function PostView() {
               />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
-              {activeImage.createdAt
-                ? new Date(activeImage.createdAt).toLocaleString()
-                : ""}
+              {activeImage.createdAt ? new Date(activeImage.createdAt).toLocaleString() : ""}
             </div>
           </div>
         ) : (
-          <div style={{ marginTop: 12, color: "#94a3b8" }}>
-            표시할 이미지가 없습니다.
-          </div>
+          <div style={{ marginTop: 12, color: "#94a3b8" }}>표시할 이미지가 없습니다.</div>
         )}
 
         {gallerySources.length > 1 && (
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-              marginTop: 12,
-            }}
-          >
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
             {gallerySources.map((img) => (
               <button
                 key={img.imageId || img.imageUrl}
@@ -322,18 +366,43 @@ export default function PostView() {
         )}
       </div>
 
-      {/* 🔹 기존 attachments 링크 표시는 숨김 (이미지 갤러리로만 노출) */}
+      <hr className="detail-separator" style={{ marginTop: 18 }} />
 
-      {/* 하단 버튼 */}
+      {/* ✅ 댓글 섹션 (추가) */}
+      <div className="replies-section">
+        <h3>댓글 ({replies.length})</h3>
+
+        <form onSubmit={handleReplySubmit} className="reply-form">
+          <textarea
+            className="form-textarea"
+            placeholder="댓글을 입력하세요"
+            value={newReplyText}
+            onChange={(e) => setNewReplyText(e.target.value)}
+            rows={3}
+          />
+          <button type="submit" className="form-btn btn-submit">
+            등록
+          </button>
+        </form>
+
+        <div className="reply-list">
+          {replies.length === 0 ? (
+            <p className="no-replies">아직 댓글이 없습니다.</p>
+          ) : (
+            replies.map((reply) => (
+              <ReplyItem key={reply.id} reply={reply} onActionSuccess={fetchDetail} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 하단 버튼 (기존) */}
       <div className="form-actions" style={{ marginTop: 24 }}>
         <Link className="form-btn btn-cancel" to={`/board/${boardType}`}>
           목록
         </Link>
 
-        <Link
-          className="form-btn btn-submit"
-          to={`/board/${boardType}/${id}/edit`}
-        >
+        <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
           수정
         </Link>
 

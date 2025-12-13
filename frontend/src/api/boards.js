@@ -33,3 +33,23 @@ export function updateBoardPost(boardType, id, body) {
 export function deleteBoardPost(boardType, id) {
   return del(`/api/board-posts/${id}`);
 }
+/* =========================
+   ✅ 댓글 API (서버 라우트 확정본)
+   GET  /api/posts/:postId/comments
+   POST /api/posts/:postId/comments   (requireAuth)
+========================= */
+
+// 댓글 목록
+export function listReplies(boardType, postId) {
+  return getJSON(`/api/posts/${postId}/comments`);
+}
+
+// 댓글 작성
+export function submitReply(boardType, postId, content) {
+  return postJSON(`/api/posts/${postId}/comments`, { content });
+}
+
+// 게시글 좋아요 토글
+export function addLike(boardType, postId) {
+  return postJSON(`/api/posts/${postId}/like`);
+}
