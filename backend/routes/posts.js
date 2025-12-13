@@ -210,7 +210,7 @@ router.get("/:postId", async (req, res) => {
     address, // 🔥 프론트에서 온 도로명 주소(카카오/네이버 검색 값)
   } = req.body;
 
-  if (!title || !postBody || !category) {
+  if (!title || !postBody) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
