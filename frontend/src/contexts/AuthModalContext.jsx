@@ -55,6 +55,7 @@ export function AuthModalProvider({ children }) {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("token"); 
     setIsLoggedIn(false);
     setUserInfo(null);
     alert("로그아웃 되었습니다.");
