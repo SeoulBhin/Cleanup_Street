@@ -147,6 +147,7 @@ export default function PostForm() {
         // ✅ 새 글 작성: category는 보내지 않고 autoCategory=true → KoBERT가 분류
         const created = await createBoardPost(boardType, {
           ...base,
+          content: form.content,
           postBody: form.content,
           autoCategory: true,
         });

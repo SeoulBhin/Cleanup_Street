@@ -16,8 +16,8 @@ export function getBoardPost(boardType, id) {
 
 // ✅ 새 글 작성은 /api/posts 로 보내고, body 전체를 그대로 전달
 export function createBoardPost(boardType, body) {
-  return postJSON(`/api/posts`, {
-    ...body, // postBody 포함
+  return postJSON(`/api/board-posts`, {
+    ...body,
     category: body.category,
   });
 }
