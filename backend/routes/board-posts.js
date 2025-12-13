@@ -279,10 +279,10 @@ router.post("/", requireAuth, async (req, res, next) => {
       selectedVariant = "AUTO",
     } = req.body;
 
-    if (!title || !content || !category) {
+    if (!title || !content) { // " || !category" << 이거 KoBert 자동분류 할거라서 삭제함 
       return res
         .status(400)
-        .json({ message: "필수 값 누락 (title / content / category)", code: "MISSING_FIELDS" });
+        .json({ message: "필수 값 누락 (title / content)", code: "MISSING_FIELDS" });
     }
 
     // 1) 주소/좌표 처리 (지오코딩 포함)
