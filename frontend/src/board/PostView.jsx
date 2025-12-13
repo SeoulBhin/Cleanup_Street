@@ -56,15 +56,6 @@ export default function PostView() {
 
       // 2) 댓글 불러오기 (서버 확정 라우트)
       const r = await listReplies(boardType, id);
-      const normalized = Array.isArray(r)
-  ? r.map((x) => ({
-      ...x,
-      id: x.id ?? x.comment_id ?? x.commentId, // 핵심
-    }))
-  : [];
-
-setReplies(normalized);
-
       setReplies(Array.isArray(r) ? r : []);
     } catch (err) {
       console.error("게시글/댓글 불러오기 실패:", err);
@@ -281,6 +272,11 @@ setReplies(normalized);
         >
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
+        
+      </div>
+      <div style={{ marginBottom: 12, color: "#94a3b8" }}>
+      <strong style={{ color: "#e5e7eb" }}>주소: </strong>
+      {post.address || "주소 정보 없음"}
       </div>
 
       {/* 내용 */}
