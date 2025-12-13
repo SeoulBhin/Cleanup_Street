@@ -6,7 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthModalProvider, useAuthModal } from "./contexts/AuthModalContext"; 
 import LoginModal from "./front/LoginModal";
 import SignupModal from "./front/SignupModal";
-
+import OAuthCallback from "./front/Callback";
 // 페이지 및 레이아웃 컴포넌트 import (경로 확인 필수)
 import Layout from "./front/Layout"; 
 import HomePage from "./front/HomePage";
@@ -52,6 +52,7 @@ function AppRoutes() {
     return (
         <Router>
             <Routes>
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
                 {/* Layout 내부에 Header가 있고, Provider 내부에서 렌더링됩니다. */}
                 <Route element={<Layout />}> 
                     <Route path="/" element={<HomePage />} />
