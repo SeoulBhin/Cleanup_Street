@@ -148,7 +148,6 @@ export default function PostForm() {
         const created = await createBoardPost(boardType, {
           ...base,
           content: form.content,
-          postBody: form.content,
           autoCategory: true,
         });
 
