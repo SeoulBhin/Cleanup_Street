@@ -17,7 +17,7 @@ export function getBoardPost(boardType, id) {
 // ✅ 새 글 작성: userId/user_id 같은 필드는 프론트에서 보내지 않음 (서버가 토큰으로 결정)
 export function createBoardPost(boardType, body) {
   const { userId, user_id, ...safeBody } = body || {};
-  return postJSON(`/api/board-posts`, {
+  return postJSON(`/api/posts`, {
     ...safeBody,
     category: safeBody.category,
   });
@@ -26,14 +26,14 @@ export function createBoardPost(boardType, body) {
 // ✅ 수정도 마찬가지로 userId 계열 제거 (안전장치)
 export function updateBoardPost(boardType, id, body) {
   const { userId, user_id, ...safeBody } = body || {};
-  return putJSON(`/api/board-posts/${id}`, {
+  return putJSON(`/api/posts/${id}`, {
     ...safeBody,
     category: boardType || safeBody.category,
   });
 }
 
 export function deleteBoardPost(boardType, id) {
-  return del(`/api/board-posts/${id}`);
+  return del(`/api/posts/${id}`);
 }
 
 /* =========================
