@@ -1,7 +1,7 @@
 // backend/routes/posts.js
 const express = require("express");
 const router = express.Router();
-const db = require("../db");              // pg 래퍼 (db.query)
+const db = require("../db"); // pg 래퍼 (db.query)
 const fetch = require("node-fetch");
 const h3 = require("h3-js");
 const path = require("path");
@@ -10,65 +10,85 @@ const crypto = require("crypto");
 
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 
+// ================== 업로드 경로 관련 유틸 ==================
+
 function resolveUploadPath(url) {
   if (!url || typeof url !== "string") return null;
-  // data URI나 http(s):// 이 아닌 경우 스킵
+
   const uploadsIdx = url.indexOf("/uploads/");
   if (uploadsIdx === -1) return null;
-  const filename = url.slice(uploadsIdx + "/uploads/".length).split(/[?#]/)[0];
+
+  const filename = url
+    .slice(uploadsIdx + "/uploads/".length)
+    .split(/[?#]/)[0];
+
   if (!filename) return null;
+
   return path.join(UPLOAD_DIR, filename);
 }
 
 // 선택된 이미지 URL을 현재 업로드 디렉터리에 복사/저장 후 새 공개 URL 반환
 async function persistImageToUploads(selectedImageUrl, req, variant = "AUTO") {
   if (!selectedImageUrl) return null;
+
   try {
     let buf;
     let ext = ".jpg";
 
     if (selectedImageUrl.startsWith("data:")) {
+      // data URI 형식인 경우
       const match = selectedImageUrl.match(/^data:(.*?);base64,(.*)$/);
       if (!match) throw new Error("Invalid data URI");
       const [, meta, b64] = match;
       const ct = meta || "";
+
       if (ct.includes("png")) ext = ".png";
       else if (ct.includes("webp")) ext = ".webp";
       else if (ct.includes("gif")) ext = ".gif";
+
       buf = Buffer.from(b64, "base64");
     } else {
+      // 일반 URL인 경우
       const res = await fetch(selectedImageUrl);
       if (!res.ok) throw new Error(`fetch ${res.status}`);
+
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("png")) ext = ".png";
       else if (ct.includes("webp")) ext = ".webp";
       else if (ct.includes("gif")) ext = ".gif";
+
       buf = Buffer.from(await res.arrayBuffer());
     }
 
     await fs.mkdir(UPLOAD_DIR, { recursive: true });
-    const filename = `${variant.toLowerCase()}-${crypto.randomBytes(8).toString("hex")}${ext}`;
+
+    const filename = `${variant.toLowerCase()}-${crypto
+      .randomBytes(8)
+      .toString("hex")}${ext}`;
     const dest = path.join(UPLOAD_DIR, filename);
+
     await fs.writeFile(dest, buf);
 
     const proto = req.headers["x-forwarded-proto"] || req.protocol;
     const host = req.headers["x-forwarded-host"] || req.get("host");
     const base = `${proto}://${host}`;
+
     return `${base}/uploads/${filename}`;
   } catch (err) {
     console.warn("[persistImageToUploads] failed", err.message || err);
-    return selectedImageUrl; // 실패 시 기존 URL 그대로 사용
+    // 실패 시 기존 URL 그대로 사용
+    return selectedImageUrl;
   }
 }
 
 async function deleteLocalUpload(url) {
   const filePath = resolveUploadPath(url);
   if (!filePath) return;
+
   try {
     await fs.unlink(filePath);
     console.log("[uploads] removed", filePath);
   } catch (err) {
-    // 파일이 없으면 무시
     if (err.code !== "ENOENT") {
       console.warn("[uploads] delete failed", filePath, err.message);
     }
@@ -76,6 +96,7 @@ async function deleteLocalUpload(url) {
 }
 
 // ================== 공통 SELECT ==================
+
 const BASE_SELECT = `
   SELECT
     p.post_id,
@@ -117,6 +138,46 @@ async function fetchPostById(postId) {
   return rows[0] || null;
 }
 
+// ================== KoBERT 자동 분류 ==================
+
+/**
+ * KoBERT 분류 서버에 제목+본문을 보내 카테고리 라벨을 받아온다.
+ * .env에 KOBERT_URL이 있으면 그걸 쓰고, 없으면 기본 localhost:9000 사용.
+ */
+async function classifyCategory(text) {
+  const url = process.env.KOBERT_URL || "http://127.0.0.1:9000/v1/classify";
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!res.ok) {
+      console.error("[KOBERT] status:", res.status);
+      const body = await res.text().catch(() => "");
+      console.error("[KOBERT] body:", body);
+      return null;
+    }
+
+    const data = await res.json().catch(() => null);
+    const label = data?.label || data?.predicted_label;
+
+    if (!label) {
+      console.warn("[KOBERT] no label in response:", data);
+      return null;
+    }
+
+    console.log("[KOBERT] predicted label:", label);
+    return label;
+  } catch (err) {
+    console.error("[KOBERT] error:", err.message || err);
+    return null;
+  }
+}
+
+// ================== 네이버 지오코딩 ==================
 
 async function geocodeNaver(address) {
   if (!address || !address.trim()) return null;
@@ -130,7 +191,7 @@ async function geocodeNaver(address) {
       headers: {
         "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
         "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     });
 
@@ -180,6 +241,7 @@ router.get("/", async (req, res) => {
 // GET a single post by ID
 router.get("/:postId", async (req, res) => {
   const { postId } = req.params;
+
   try {
     const post = await fetchPostById(postId);
     if (!post) {
@@ -192,7 +254,7 @@ router.get("/:postId", async (req, res) => {
   }
 });
 
-// ================== 새 글 작성 (주소 + 지도/H3 포함) ==================
+// ================== 새 글 작성 (주소 + 지도/H3 + KoBERT 자동 분류) ==================
 
 router.post("/", async (req, res) => {
   // JWT 안 쓰는 모자이크 파이프라인이라 일단 기본값 1
@@ -201,15 +263,18 @@ router.post("/", async (req, res) => {
   const {
     title,
     postBody,
-    category,
+    category, // 사용자가 직접 고른 카테고리(있을 수도, 없을 수도)
     latitude,
     longitude,
     h3Index,
     previewId,
-    address, // 🔥 프론트에서 온 도로명 주소(카카오/네이버 검색 값)
+    address, // 프론트에서 온 도로명 주소(카카오/네이버 검색 값)
+    attachments = [],
+    autoCategory, // true 면 KoBERT 강제 사용, 없더라도 category 없으면 자동 분류
   } = req.body;
 
-  if (!title || !postBody || !category) {
+  // 제목 / 내용은 항상 필수
+  if (!title || !postBody) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -242,6 +307,29 @@ router.post("/", async (req, res) => {
     const location =
       lat && lng ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
+    // 4) KoBERT 자동 분류: 최종 category 결정
+    let finalCategory = category;
+
+    const useAuto =
+      autoCategory === true ||
+      autoCategory === "true" ||
+      !finalCategory; // 사용자가 카테고리를 안 고른 경우 자동 분류
+
+    if (useAuto) {
+      const textForClassify = [title, postBody].filter(Boolean).join("\n\n");
+      const predicted = await classifyCategory(textForClassify);
+      if (predicted) {
+        finalCategory = predicted;
+      }
+    }
+
+    // 자동 분류까지 했는데도 카테고리가 없으면 에러
+    if (!finalCategory) {
+      return res.status(400).json({
+        error: "Category is required (auto classification failed).",
+      });
+    }
+
     // === 모자이크 미리보기 이미지 로드(있을 때만) ===
     let previewData = null;
     if (previewId) {
@@ -255,7 +343,7 @@ router.post("/", async (req, res) => {
       previewData = previewResult.rows[0];
     }
 
-    // 4) posts INSERT (latitude / longitude / h3_index / location 포함)
+    // 5) posts INSERT (latitude / longitude / h3_index / location 포함)
     const insertQuery = `
       INSERT INTO posts (
         user_id,
@@ -278,7 +366,7 @@ router.post("/", async (req, res) => {
       userId,
       title,
       postBody,
-      category,
+      finalCategory, // ★ KoBERT 포함 최종 카테고리
       location,
       h3Idx,
       status,
@@ -289,7 +377,7 @@ router.post("/", async (req, res) => {
     const { rows } = await db.query(insertQuery, insertValues);
     const newPostId = rows[0].post_id;
 
-    // 5) post_images 에 선택된 이미지 저장 (있을 때만)
+    // 6) post_images 에 선택된 이미지 저장 (있을 때만)
     if (previewData) {
       const selectedVariant =
         req.body.selectedVariant === "PLATE_VISIBLE"
@@ -299,6 +387,7 @@ router.post("/", async (req, res) => {
         selectedVariant === "PLATE_VISIBLE"
           ? previewData.plate_visible_image
           : previewData.auto_mosaic_image;
+
       const selectedImage = await persistImageToUploads(
         selectedImageRaw,
         req,
@@ -314,13 +403,16 @@ router.post("/", async (req, res) => {
         selectedImage,
         selectedVariant,
       ]);
+
       await db.query(
         "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
         [previewId]
       );
-      // 선택하지 않은 미리보기 파일/레코드 정리
+
+      // 선택하지 않은 미리보기 파일/원본 정리 후 미리보기 레코드 삭제
       const deleteTargets = [];
       const originalUrl = previewData.original_image_url;
+
       if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
         deleteTargets.push(previewData.plate_visible_image);
       }
@@ -328,6 +420,7 @@ router.post("/", async (req, res) => {
         deleteTargets.push(previewData.auto_mosaic_image);
       }
       if (originalUrl) deleteTargets.push(originalUrl);
+
       await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
       await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
         previewId,
@@ -335,8 +428,9 @@ router.post("/", async (req, res) => {
     }
 
     // 원본 첨부는 저장하지 않음 (프라이버시)
+    // attachments 배열은 받아만 두고 사용하지 않음
 
-    // 6) 방금 저장한 게시글 다시 조회해서 반환
+    // 7) 방금 저장한 게시글 다시 조회해서 반환
     const createdPost = await fetchPostById(newPostId);
     res.status(201).json(createdPost);
   } catch (err) {
@@ -345,7 +439,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ================== 글 수정 (주소 + 지도/H3 포함) ==================
+// ================== 글 수정 (주소 + 지도/H3, 수동 카테고리 유지) ==================
 
 router.put("/:postId", async (req, res) => {
   const { postId } = req.params;
@@ -357,8 +451,9 @@ router.put("/:postId", async (req, res) => {
     latitude,
     longitude,
     h3Index,
-    previewId,     // 수정하면서 새 미리보기 선택했을 때만 들어옴
-    address,       // 수정 시에도 주소 문자열
+    previewId, // 수정하면서 새 미리보기 선택했을 때만 들어옴
+    address, // 수정 시에도 주소 문자열
+    attachments = [],
   } = req.body;
 
   if (!title || !postBody || !category) {
@@ -377,7 +472,7 @@ router.put("/:postId", async (req, res) => {
         lat = geo.lat;
         lng = geo.lng;
         if (!h3Idx && lat && lng) {
-          h3Idx = h3.latLngToCell(lat, lng, 8); 
+          h3Idx = h3.latLngToCell(lat, lng, 8);
         }
       } else {
         console.warn("[POSTS][UPDATE] geocode failed for address:", address);
@@ -388,7 +483,7 @@ router.put("/:postId", async (req, res) => {
     if (lng !== null && lng !== undefined) lng = Number(lng);
 
     console.log("[POSTS] final coords:", { lat, lng, h3Idx, address });
-    
+
     const location =
       lat && lng ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
@@ -417,14 +512,13 @@ router.put("/:postId", async (req, res) => {
       lat,
       lng,
     ];
-    
 
     const { rows } = await db.query(updateQuery, updateValues);
     if (!rows.length) {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    // 새 previewId가 온 경우에만 이미지 추가 (필요시 기존 이미지 삭제 로직 추가 가능)
+    // 새 previewId가 온 경우에만 이미지 추가
     if (previewId) {
       const previewResult = await db.query(
         "SELECT original_image_url, auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
@@ -440,6 +534,7 @@ router.put("/:postId", async (req, res) => {
           selectedVariant === "PLATE_VISIBLE"
             ? previewData.plate_visible_image
             : previewData.auto_mosaic_image;
+
         const selectedImage = await persistImageToUploads(
           selectedImageRaw,
           req,
@@ -461,6 +556,7 @@ router.put("/:postId", async (req, res) => {
         // 선택하지 않은 미리보기/원본 파일 정리 후 미리보기 레코드 삭제
         const deleteTargets = [];
         const originalUrl = previewData.original_image_url;
+
         if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
           deleteTargets.push(previewData.plate_visible_image);
         }
@@ -468,6 +564,7 @@ router.put("/:postId", async (req, res) => {
           deleteTargets.push(previewData.auto_mosaic_image);
         }
         if (originalUrl) deleteTargets.push(originalUrl);
+
         await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
         await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
           previewId,
@@ -475,7 +572,9 @@ router.put("/:postId", async (req, res) => {
       }
     }
 
-    // 원본 첨부는 저장하지 않음 (프라이버시)
+    // 첨부 배열이 오면 ORIGINAL로 추가 저장 (append) 하지 않고,
+    // 현재 정책상 원본 이미지는 게시글에 남기지 않는 것이 안전하므로 무시
+    void attachments;
 
     const updatedPost = await fetchPostById(postId);
     res.json(updatedPost);
