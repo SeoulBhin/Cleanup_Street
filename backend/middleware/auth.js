@@ -4,10 +4,10 @@ const jwt = require('jsonwebtoken');
 const BYPASS_AUTH = process.env.BYPASS_AUTH === 'true';
 exports.requireAuth = (req, res, next) => {
   try {
-    /*
+
     // =======================
     // 🔥 1) 테스트 모드라면 바로 통과
-    // =======================
+    /*/ =======================
     if (BYPASS_AUTH) {
       req.user = {
         id: 9999,
@@ -18,8 +18,8 @@ exports.requireAuth = (req, res, next) => {
       };
       return next();
     }
-    // =======================
     */
+    
     const authHeader = req.headers['authorization'];
     if (!authHeader) return res.status(401).json({ message: '토큰 필요' });
 
@@ -27,7 +27,10 @@ exports.requireAuth = (req, res, next) => {
     if (!token) return res.status(401).json({ message: '토큰 형식 오류' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; 
+    req.user = {
+  ...decoded,
+  id: decoded.id ?? decoded.user_id ?? decoded.userId,
+}; 
 
     next();
   } catch (err) {
