@@ -1,34 +1,42 @@
 // src/api/boards.js
 import { del, getJSON, postJSON, putJSON } from "./http";
 
-export function listBoardPosts(boardType, q = "") {
-  return getJSON(
-    `/api/board-posts?boardType=${encodeURIComponent(
-      boardType
-    )}&q=${encodeURIComponent(q)}`
-  );
+export function listBoardPosts(boardType, q = "", opts = {}) {
+  const limit = opts.limit ?? 50;
+  const offset = opts.offset ?? 0;
+  return getJSON(`/api/posts?limit=${limit}&offset=${offset}`);
 }
 
-// 상세 조회는 그대로 board-posts 사용
+// ✅ 상세 조회도 posts.js로 통일
 export function getBoardPost(boardType, id) {
-  return getJSON(`/api/board-posts/${id}`);
+  return getJSON(`/api/posts/${id}`);
 }
 
-// ✅ 새 글 작성: userId/user_id 같은 필드는 프론트에서 보내지 않음 (서버가 토큰으로 결정)
+// ✅ 새 글 작성: content -> postBody 변환 + category 결정
 export function createBoardPost(boardType, body) {
-  const { userId, user_id, ...safeBody } = body || {};
+  const { userId, user_id, content, postBody, ...rest } = body || {};
+
+  const finalCategory = (rest.category ?? boardType ?? "기타");
+  const finalPostBody = (content ?? postBody ?? "").toString();
+
   return postJSON(`/api/posts`, {
-    ...safeBody,
-    category: safeBody.category,
+    ...rest,
+    category: finalCategory,
+    postBody: finalPostBody,
   });
 }
 
-// ✅ 수정도 마찬가지로 userId 계열 제거 (안전장치)
+// ✅ 수정: content -> postBody 변환 + category 결정
 export function updateBoardPost(boardType, id, body) {
-  const { userId, user_id, ...safeBody } = body || {};
+  const { userId, user_id, content, postBody, ...rest } = body || {};
+
+  const finalCategory = (rest.category ?? boardType ?? "기타");
+  const finalPostBody = (content ?? postBody ?? "").toString();
+
   return putJSON(`/api/posts/${id}`, {
-    ...safeBody,
-    category: boardType || safeBody.category,
+    ...rest,
+    category: finalCategory,
+    postBody: finalPostBody,
   });
 }
 
