@@ -144,7 +144,7 @@ export default function PostForm() {
         // ✅ 새 글 작성 → /api/board-posts(or posts 래퍼) → postBody 사용
         const created = await createBoardPost(boardType, {
           ...base,
-          postBody: form.content,
+          content: form.content,
         });
 
         const newId = created.post_id || created.id;
