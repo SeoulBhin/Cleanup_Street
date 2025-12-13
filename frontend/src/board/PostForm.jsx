@@ -184,23 +184,6 @@ export default function PostForm() {
           />
         </div>
 
-        {/* 카테고리 */}
-        <div className="form-group">
-          <label>카테고리</label>
-          <select
-            className="form-select"
-            name="category"
-            value={form.category}
-            onChange={onChange}
-          >
-            {FORUM_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* 주소 + 검색 버튼 */}
         <div className="form-group">
           <label>주소</label>
