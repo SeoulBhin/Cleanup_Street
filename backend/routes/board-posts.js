@@ -14,9 +14,8 @@ async function fetchCompat(url, options) {
   return f(url, options);
 }
 
-
-const KOBERT_URL = process.env.KOBERT_URL;           // 없으면 undefined
-const KOBERT_ENABLED = !!process.env.KOBERT_URL;     // URL 있을 때만 ON
+const KOBERT_URL = process.env.KOBERT_URL; // 없으면 undefined
+const KOBERT_ENABLED = !!process.env.KOBERT_URL; // URL 있을 때만 ON
 
 const ALLOWED_CATEGORIES = new Set([
   "도로-교통",
@@ -40,14 +39,13 @@ function normalizeCategory(raw) {
   if (s === "자연-재난환경") s = "자연재난-환경";
   if (s === "자연재난환경") s = "자연재난-환경";
 
-  // 예: "치안·범죄위험" -> 위에서 "-"로 바뀌지만 혹시 누락 대비
   if (s === "치안-범죄위험") s = "치안-범죄위험";
 
   return s;
 }
 
 async function classifyByKoBERT(text) {
-  if (!KOBERT_ENABLED) return null; // ✅ 팀 환경/배포에서 KoBERT 호출 자체를 안 함
+  if (!KOBERT_ENABLED) return null;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 10000);
@@ -64,7 +62,6 @@ async function classifyByKoBERT(text) {
 
     const data = await res.json();
 
-    // ⚠️ 응답 필드명은 서버 구현에 따라 다를 수 있음(확실하지 않음)
     const picked =
       data?.category ||
       data?.label ||
@@ -93,8 +90,6 @@ const { geocodeAddress } = require("../utils/geocode");
 
 /**
  * 공통 SELECT 구문
- * - posts + post_images 묶어서 한 번에 내려줌
- * - 프론트 PostView의 post.images 렌더링에 맞춤
  */
 const BASE_SELECT = `
   SELECT
@@ -132,7 +127,39 @@ const BASE_SELECT = `
 `;
 
 /**
- * 공통: 단일 게시글 조회 함수
+ * ✅ 작성자 체크 헬퍼
+ * - 존재 확인 + 작성자 비교
+ */
+async function assertOwnerOrThrow(postId, req) {
+  const { rows } = await db.query(
+    `SELECT user_id FROM posts WHERE post_id = $1`,
+    [postId]
+  );
+
+  if (!rows.length) {
+    return { ok: false, status: 404, body: { message: "Post not found" } };
+  }
+
+  const ownerId = Number(rows[0].user_id);
+  const me = Number(req.user?.id); // ✅ requireAuth가 id 세팅함
+
+  if (!Number.isFinite(me)) {
+    return { ok: false, status: 401, body: { message: "Unauthorized" } };
+  }
+
+  if (ownerId !== me) {
+    return {
+      ok: false,
+      status: 403,
+      body: { message: "수정/삭제 권한이 없습니다.", code: "NOT_AUTHOR" },
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * 단일 게시글 조회 함수
  */
 const fetchPostById = async (postId) => {
   const query = `${BASE_SELECT} WHERE p.post_id = $1`;
@@ -142,7 +169,6 @@ const fetchPostById = async (postId) => {
 
 /**
  * content 안에 포함된 이미지 URL까지 병합
- * - post_images에 없는 경우도 ORIGINAL variant로 내려줘서 프론트에서 <img>로 렌더 가능
  */
 function enrichImages(row) {
   if (!row) return row;
@@ -272,10 +298,8 @@ function buildSpatialFields(lat, lng) {
   return { h3_index, location };
 }
 
-
 // ================================
 // 목록 조회  GET /api/board-posts
-//   ?boardType=free&q=검색어
 // ================================
 router.get("/", async (req, res, next) => {
   try {
@@ -328,7 +352,6 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-
 // ================================
 // 게시글 생성  POST /api/board-posts
 // ================================
@@ -337,9 +360,9 @@ router.post("/", requireAuth, async (req, res, next) => {
     const {
       title,
       content,
-      postBody, // ✅ 호환: 팀원 프론트가 postBody로 보내는 경우
+      postBody,
       category,
-      autoCategory = false, 
+      autoCategory = false,
       address,
       latitude = null,
       longitude = null,
@@ -347,42 +370,33 @@ router.post("/", requireAuth, async (req, res, next) => {
       previewId = null,
       selectedVariant = "AUTO",
     } = req.body;
-    
-    // ✅ 최종 본문: content 우선, 없으면 postBody 사용
+
     const finalContent = (content ?? postBody ?? "").toString();
 
-    // ✅ 최소 필수값 체크
     if (!title || !finalContent) {
       return res
         .status(400)
-        .json({ message: "필수 값 누락 (title / content)", code: "MISSING_FIELDS" });
+        .json({
+          message: "필수 값 누락 (title / content)",
+          code: "MISSING_FIELDS",
+        });
     }
 
-    
-    // ✅ 0) KoBERT 자동 분류 + 최종 안전장치
     let finalCategory = (category ?? "").toString().trim();
     if (!finalCategory) finalCategory = "기타";
 
-    // autoCategory가 true일 때만 KoBERT 시도 (KoBERT_URL 있어야 동작)
     if (autoCategory === true && KOBERT_ENABLED) {
       try {
         const predicted = await classifyByKoBERT(`${title}\n${finalContent}`);
         if (predicted) finalCategory = predicted;
       } catch {
-        // KoBERT 실패 시 finalCategory 유지
+        // ignore
       }
     }
 
-    // ✅ 최종 안전장치: 정규화 후 허용 카테고리면 적용, 아니면 '기타'
     const norm = normalizeCategory(finalCategory);
     finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
 
-
-
-
-
-
-    // 1) 주소/좌표 처리
     const locResult = await resolveLocation({ latitude, longitude, address });
     if (locResult.error) {
       return res.status(locResult.error.status).json(locResult.error.body);
@@ -391,10 +405,8 @@ router.post("/", requireAuth, async (req, res, next) => {
     const resolvedLng = locResult.lng;
     const resolvedAddress = locResult.address;
 
-    // 2) H3, location 계산
     const { h3_index, location } = buildSpatialFields(resolvedLat, resolvedLng);
 
-    // 3) posts INSERT
     const insertQuery = `
       INSERT INTO posts
         (user_id, title, content, category,
@@ -407,10 +419,11 @@ router.post("/", requireAuth, async (req, res, next) => {
       RETURNING post_id AS id
     `;
 
+    const me = Number(req.user?.id); // ✅ id로 통일
     const { rows } = await db.query(insertQuery, [
-      req.user.user_id,
+      me,
       title,
-      finalContent, // ✅ 여기!
+      finalContent,
       finalCategory,
       resolvedAddress,
       resolvedLat,
@@ -421,7 +434,6 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const postId = rows[0].id;
 
-    // 4) 미리보기(previewId) → 모자이크 이미지 1장 저장
     if (previewId) {
       try {
         const { rows: previewRows } = await db.query(
@@ -460,7 +472,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
     }
 
-    // 5) 추가 첨부(attachments)
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const params = [postId];
       const values = attachments.map((url, idx) => {
@@ -484,15 +495,23 @@ router.post("/", requireAuth, async (req, res, next) => {
 });
 
 // ================================
-// 게시글 수정  PUT /api/board-posts/:id
+// ✅ 게시글 수정  PUT /api/board-posts/:id  (작성자만)
 // ================================
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ message: "BAD_POST_ID" });
+    }
+
+    // ✅ 작성자 체크 추가
+    const own = await assertOwnerOrThrow(id, req);
+    if (!own.ok) return res.status(own.status).json(own.body);
+
     const {
       title,
       content,
-      postBody, // ✅ 호환
+      postBody,
       category,
       address,
       latitude = null,
@@ -500,31 +519,28 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       attachments = [],
     } = req.body;
 
-    // ✅ 최종 본문: content 우선, 없으면 postBody 사용
     const finalContent = (content ?? postBody ?? "").toString();
 
-    // ✅ 최소 필수값 체크
     if (!title || !finalContent) {
       return res
         .status(400)
-        .json({ message: "필수 값 누락 (title / content)", code: "MISSING_FIELDS" });
+        .json({
+          message: "필수 값 누락 (title / content)",
+          code: "MISSING_FIELDS",
+        });
     }
 
-
-
-    // ✅ category 정규화(가능하면), 아니면 '기타'로 강제 (업데이트 시 안전)
     let finalCategory = (category ?? "").toString().trim();
     if (!finalCategory) finalCategory = "기타";
 
     const norm = normalizeCategory(finalCategory);
     finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
 
-
-
     const locResult = await resolveLocation({ latitude, longitude, address });
     if (locResult.error) {
       return res.status(locResult.error.status).json(locResult.error.body);
     }
+
     const resolvedLat = locResult.lat;
     const resolvedLng = locResult.lng;
     const resolvedAddress = locResult.address;
@@ -544,12 +560,13 @@ router.put("/:id", requireAuth, async (req, res, next) => {
         location   = $8,
         updated_at = NOW()
       WHERE post_id = $9
+      RETURNING post_id
     `;
 
-    await db.query(updateQuery, [
+    const upd = await db.query(updateQuery, [
       title,
       finalContent,
-      finalCategory, // ✅ 여기만 category → finalCategory로 변경
+      finalCategory,
       resolvedAddress,
       resolvedLat,
       resolvedLng,
@@ -557,6 +574,10 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       location,
       id,
     ]);
+
+    if (!upd.rowCount) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
     await db.query(`DELETE FROM post_images WHERE post_id = $1`, [id]);
 
@@ -576,22 +597,32 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       );
     }
 
-    res.json({ success: true, id: Number(id) });
+    res.json({ success: true, id });
   } catch (err) {
     next(err);
   }
 });
 
-
 // ================================
-// 게시글 삭제  DELETE /api/board-posts/:id
+// ✅ 게시글 삭제  DELETE /api/board-posts/:id  (작성자만)
 // ================================
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ message: "BAD_POST_ID" });
+    }
+
+    // ✅ 작성자 체크 추가
+    const own = await assertOwnerOrThrow(id, req);
+    if (!own.ok) return res.status(own.status).json(own.body);
 
     await db.query(`DELETE FROM post_images WHERE post_id = $1`, [id]);
-    await db.query(`DELETE FROM posts       WHERE post_id = $1`, [id]);
+
+    const delRes = await db.query(`DELETE FROM posts WHERE post_id = $1`, [id]);
+    if (!delRes.rowCount) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
     res.json({ success: true });
   } catch (err) {
