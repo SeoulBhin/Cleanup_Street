@@ -19,8 +19,9 @@ export default function PostForm() {
     title: "",
     category: FORUM_CATEGORIES[0],
     content: "",
-    attachments: [], // 실제 저장용으로 보내지 않음(프라이버시), 프리뷰 생성만 사용
-    address: "", // ✅ 주소 필드
+    // 실제 저장용으로 보내지 않음(프라이버시), 프리뷰 생성만 사용
+    attachments: [],
+    address: "",
   });
   const [preview, setPreview] = useState(null); // { previewId, autoUrl, plateUrl, selectedVariant }
   const [uploading, setUploading] = useState(false);
@@ -77,6 +78,7 @@ export default function PostForm() {
     try {
       setUploading(true);
       setProcessingText("이미지 처리 중입니다. 잠시만 기다려주세요...");
+
       const { urls } = await uploadFiles(files);
       setForm((s) => ({
         ...s,
@@ -122,11 +124,10 @@ export default function PostForm() {
       return;
     }
 
-    // 공통 필드
+    // 공통 필드 (여기에는 category를 넣지 않는다)
     const base = {
       title: form.title,
-      category: form.category, // 실제 DB category
-      attachments: [], // 원본은 저장하지 않음 (모자이크만 저장)
+      attachments: [], // 원본은 저장하지 않음 (모자이크만 서버에서 관리)
       address: form.address?.trim() || null,
       previewId: preview?.previewId || null,
       selectedVariant: preview?.selectedVariant || "AUTO",
@@ -134,17 +135,20 @@ export default function PostForm() {
 
     try {
       if (isEdit) {
-        // ✅ 수정 → /api/board-posts → content 사용
+        // ✅ 수정: 이미 분류된 글 → 기존 category 유지, autoCategory=false
         await updateBoardPost(boardType, id, {
           ...base,
           content: form.content,
+          category: form.category, // 서버에서 가져온 값 유지
+          autoCategory: false,
         });
         navigate(`/board/${boardType}/${id}`);
       } else {
-        // ✅ 새 글 작성 → /api/board-posts(or posts 래퍼) → postBody 사용
+        // ✅ 새 글 작성: category는 보내지 않고 autoCategory=true → KoBERT가 분류
         const created = await createBoardPost(boardType, {
           ...base,
           postBody: form.content,
+          autoCategory: true,
         });
 
         const newId = created.post_id || created.id;
@@ -156,7 +160,9 @@ export default function PostForm() {
       } else if (err?.status === 400 && err?.code === "INVALID_ADDRESS") {
         alert("주소를 찾을 수 없습니다. 다시 확인해 주세요.");
       } else if (err?.status === 502 && err?.code === "GEOCODE_FAILED") {
-        alert("주소를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        alert(
+          "주소를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        );
       } else {
         alert("저장 중 오류가 발생했습니다.");
       }
@@ -184,7 +190,7 @@ export default function PostForm() {
           />
         </div>
 
-        {/* 카테고리 */}
+        {/* 카테고리 (수정 화면에서만 의미 있음 / 새 글에는 실제로는 사용 안 함) */}
         <div className="form-group">
           <label>카테고리</label>
           <select
@@ -334,7 +340,8 @@ export default function PostForm() {
               </button>
             </div>
             <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
-              작성 단계에서 바로 모자이크 버전을 선택합니다. 저장 시 선택한 버전으로 게시됩니다.
+              작성 단계에서 바로 모자이크 버전을 선택합니다. 저장 시 선택한
+              버전으로 게시됩니다.
             </div>
           </div>
         )}
