@@ -1,4 +1,3 @@
-server.js 
 // backend/server.js
 require("dotenv").config();
 
