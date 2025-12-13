@@ -6,15 +6,14 @@
 
 // ✅ fetch 안전 래퍼: Node 18+는 global fetch 사용, 아니면 node-fetch를 동적 로드
 async function fetchCompat(url, options) {
-  if (typeof fetch === "function") {
-    return fetch(url, options);
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch(url, options);
   }
-  // ⚠️ node-fetch 설치가 필요할 수 있음: npm i node-fetch
-  // ⚠️ node-fetch 버전에 따라 require가 깨질 수 있어서 import() 방식 사용
   const mod = await import("node-fetch");
   const f = mod.default || mod;
   return f(url, options);
 }
+
 
 const KOBERT_URL = process.env.KOBERT_URL;           // 없으면 undefined
 const KOBERT_ENABLED = !!process.env.KOBERT_URL;     // URL 있을 때만 ON
@@ -273,8 +272,10 @@ function buildSpatialFields(lat, lng) {
   return { h3_index, location };
 }
 
+
 // ================================
 // 목록 조회  GET /api/board-posts
+//   ?boardType=free&q=검색어
 // ================================
 router.get("/", async (req, res, next) => {
   try {
@@ -327,6 +328,7 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
+
 // ================================
 // 게시글 생성  POST /api/board-posts
 // ================================
@@ -345,30 +347,39 @@ router.post("/", requireAuth, async (req, res, next) => {
       previewId = null,
       selectedVariant = "AUTO",
     } = req.body;
-
+    
     // ✅ 최종 본문: content 우선, 없으면 postBody 사용
     const finalContent = (content ?? postBody ?? "").toString();
 
+    // ✅ 최소 필수값 체크
     if (!title || !finalContent) {
       return res
         .status(400)
         .json({ message: "필수 값 누락 (title / content)", code: "MISSING_FIELDS" });
     }
 
-    // ✅ 0) KoBERT 자동 분류
-    let finalCategory = category;
+    
+    // ✅ 0) KoBERT 자동 분류 + 최종 안전장치
+    let finalCategory = (category ?? "").toString().trim();
+    if (!finalCategory) finalCategory = "기타";
 
-    if ((autoCategory === true || !finalCategory) && KOBERT_ENABLED) {
+    // autoCategory가 true일 때만 KoBERT 시도 (KoBERT_URL 있어야 동작)
+    if (autoCategory === true && KOBERT_ENABLED) {
       try {
         const predicted = await classifyByKoBERT(`${title}\n${finalContent}`);
-        finalCategory = predicted || finalCategory || "기타";
-      } catch (e) {
-        finalCategory = finalCategory || "기타";
+        if (predicted) finalCategory = predicted;
+      } catch {
+        // KoBERT 실패 시 finalCategory 유지
       }
-    } else {
-      const norm = normalizeCategory(finalCategory);
-      finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
     }
+
+    // ✅ 최종 안전장치: 정규화 후 허용 카테고리면 적용, 아니면 '기타'
+    const norm = normalizeCategory(finalCategory);
+    finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
+
+
+
+
 
 
     // 1) 주소/좌표 처리
@@ -489,14 +500,26 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       attachments = [],
     } = req.body;
 
+    // ✅ 최종 본문: content 우선, 없으면 postBody 사용
     const finalContent = (content ?? postBody ?? "").toString();
 
-    // ✅ 수정은 기존 팀원 흐름 유지: category는 필수로 둠
-    if (!title || !finalContent || !category) {
+    // ✅ 최소 필수값 체크
+    if (!title || !finalContent) {
       return res
         .status(400)
-        .json({ message: "필수 값 누락 (title / content / category)", code: "MISSING_FIELDS" });
+        .json({ message: "필수 값 누락 (title / content)", code: "MISSING_FIELDS" });
     }
+
+
+
+    // ✅ category 정규화(가능하면), 아니면 '기타'로 강제 (업데이트 시 안전)
+    let finalCategory = (category ?? "").toString().trim();
+    if (!finalCategory) finalCategory = "기타";
+
+    const norm = normalizeCategory(finalCategory);
+    finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
+
+
 
     const locResult = await resolveLocation({ latitude, longitude, address });
     if (locResult.error) {
@@ -525,8 +548,8 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 
     await db.query(updateQuery, [
       title,
-      finalContent, // ✅ 여기!
-      category,
+      finalContent,
+      finalCategory, // ✅ 여기만 category → finalCategory로 변경
       resolvedAddress,
       resolvedLat,
       resolvedLng,
@@ -558,6 +581,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
 
 // ================================
 // 게시글 삭제  DELETE /api/board-posts/:id
