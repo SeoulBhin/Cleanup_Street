@@ -1,3 +1,4 @@
+server.js 
 // backend/server.js
 require("dotenv").config();
 
@@ -420,27 +421,9 @@ app.put("/api/boards/:boardType/:id", requireAuth, async (req, res) => {
 
 app.get("/api/map", async (req, res) => {
   const FALLBACK = [
-    {
-      id: 1,
-      title: "가로등 고장",
-      lat: 37.5665,
-      lng: 126.978,
-      h3_cell: "8a2a1072b59ffff",
-    },
-    {
-      id: 2,
-      title: "도로 파손",
-      lat: 37.57,
-      lng: 126.982,
-      h3_cell: "8a2a1072b5bffff",
-    },
-    {
-      id: 3,
-      title: "쓰레기 무단투기",
-      lat: 37.5635,
-      lng: 126.975,
-      h3_cell: "8a2a1072b5dffff",
-    },
+    { id: 1, title: "가로등 고장",      lat: 37.5665, lng: 126.9780, h3_cell: "8a2a1072b59ffff" },
+    { id: 2, title: "도로 파손",        lat: 37.5700, lng: 126.9820, h3_cell: "8a2a1072b5bffff" },
+    { id: 3, title: "쓰레기 무단투기",  lat: 37.5635, lng: 126.9750, h3_cell: "8a2a1072b5dffff" },
   ];
 
   try {
@@ -449,7 +432,6 @@ app.get("/api/map", async (req, res) => {
         p.post_id AS id,
         p.title,
         p.content,
-        p.address,
         p.latitude  AS lat,
         p.longitude AS lng,
         p.h3_index::text AS h3_cell,

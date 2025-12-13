@@ -58,8 +58,7 @@ export default function PostForm() {
           title: p.title || "",
           category: p.category || FORUM_CATEGORIES[0],
           content: p.content || "",
-          attachments:
-            (p.images || []).map((img) => img.imageUrl) || [],
+          attachments: (p.images || []).map((img) => img.imageUrl) || [],
           address: p.address || "",
         })
       )
@@ -99,7 +98,9 @@ export default function PostForm() {
           setProcessingText("");
         } catch (err) {
           console.error("미리보기 생성 실패", err);
-          setProcessingText("미리보기 생성에 실패했습니다. 그래도 원본을 사용해 저장할 수 있습니다.");
+          setProcessingText(
+            "미리보기 생성에 실패했습니다. 그래도 원본을 사용해 저장할 수 있습니다."
+          );
         }
       }
     } catch {
@@ -124,7 +125,7 @@ export default function PostForm() {
     // 공통 필드
     const base = {
       title: form.title,
-      category: form.category, // 실제 DB category (예: 도로-교통)
+      category: form.category, // 실제 DB category
       attachments: [], // 원본은 저장하지 않음 (모자이크만 저장)
       address: form.address?.trim() || null,
       previewId: preview?.previewId || null,
@@ -138,16 +139,14 @@ export default function PostForm() {
           ...base,
           content: form.content,
         });
-        // 수정은 기존 id 그대로 사용
         navigate(`/board/${boardType}/${id}`);
       } else {
-        // ✅ 새 글 작성 → /api/posts → postBody 사용
+        // ✅ 새 글 작성 → /api/board-posts(or posts 래퍼) → postBody 사용
         const created = await createBoardPost(boardType, {
           ...base,
           postBody: form.content,
         });
 
-        // 백엔드 응답의 PK는 post_id (혹시 id로 오는 경우도 대비)
         const newId = created.post_id || created.id;
         navigate(`/board/${boardType}/${newId}`);
       }
@@ -287,7 +286,9 @@ export default function PostForm() {
                     background: "#0f172a",
                   }}
                 />
-                <div style={{ padding: 10, fontSize: 13, textAlign: "center" }}>
+                <div
+                  style={{ padding: 10, fontSize: 13, textAlign: "center" }}
+                >
                   얼굴+번호판 모자이크
                 </div>
               </button>
@@ -295,7 +296,10 @@ export default function PostForm() {
               <button
                 type="button"
                 onClick={() =>
-                  setPreview((p) => ({ ...p, selectedVariant: "PLATE_VISIBLE" }))
+                  setPreview((p) => ({
+                    ...p,
+                    selectedVariant: "PLATE_VISIBLE",
+                  }))
                 }
                 style={{
                   border:
@@ -322,7 +326,9 @@ export default function PostForm() {
                     background: "#0f172a",
                   }}
                 />
-                <div style={{ padding: 10, fontSize: 13, textAlign: "center" }}>
+                <div
+                  style={{ padding: 10, fontSize: 13, textAlign: "center" }}
+                >
                   얼굴만 모자이크
                 </div>
               </button>
