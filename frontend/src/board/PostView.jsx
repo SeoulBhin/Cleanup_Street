@@ -15,6 +15,9 @@ export default function PostView() {
   const { boardType, id } = useParams();
   const navigate = useNavigate();
 
+  // ✅ 로그인 여부(accessToken 기준)
+  const isLoggedIn = !!localStorage.getItem("accessToken");
+
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -46,7 +49,7 @@ export default function PostView() {
       setLoading(true);
       setLoadError(null);
 
-      // 1) 게시글 불러오기 (기존)
+      // 1) 게시글 불러오기
       const p = await getBoardPost(boardType, id);
       setPost(p);
       setSelectedImageId(null);
@@ -54,15 +57,15 @@ export default function PostView() {
       // ✅ 서버가 is_liked_by_me 내려주면 초기 좋아요 상태 세팅
       setIsLiked(!!p?.is_liked_by_me);
 
-      // 2) 댓글 불러오기 (서버 확정 라우트)
+      // 2) 댓글 불러오기
       const r = await listReplies(boardType, id);
       const normalized = Array.isArray(r)
-      ? r.map((x) => ({
-          ...x,
-          id: x.id ?? x.comment_id ?? x.commentId,
-        }))
-      : [];
-    setReplies(normalized);
+        ? r.map((x) => ({
+            ...x,
+            id: x.id ?? x.comment_id ?? x.commentId,
+          }))
+        : [];
+      setReplies(normalized);
     } catch (err) {
       console.error("게시글/댓글 불러오기 실패:", err);
       setLoadError("LOAD_FAIL");
@@ -81,6 +84,12 @@ export default function PostView() {
   // ✅ 게시글 좋아요 토글
   // --------------------------
   const handleLike = async () => {
+    // ✅ 로그인 전이면 안내만
+    if (!isLoggedIn) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
     if (!post) return;
 
     const wasLiked = isLiked;
@@ -111,7 +120,7 @@ export default function PostView() {
   };
 
   // --------------------------
-  // ✅ 댓글 작성
+  // ✅ 댓글 작성 (기존 그대로)
   // --------------------------
   const handleReplySubmit = async (e) => {
     e.preventDefault();
@@ -187,7 +196,7 @@ export default function PostView() {
   }
 
   // --------------------------
-  // ✅ (기존) 이미지 처리 로직 그대로
+  // ✅ 이미지 처리 로직 그대로
   // --------------------------
   const images = Array.isArray(post.images) ? post.images : [];
   const attachments = Array.isArray(post.attachments) ? post.attachments : [];
@@ -270,7 +279,7 @@ export default function PostView() {
         </span>
       </div>
 
-      {/* ✅ 좋아요 버튼 (추가) */}
+      {/* ✅ 좋아요 버튼 */}
       <div className="post-actions-detail" style={{ marginBottom: 12 }}>
         <button
           className={`btn-action ${isLiked ? "active" : ""}`}
@@ -278,11 +287,11 @@ export default function PostView() {
         >
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
-        
       </div>
+
       <div style={{ marginBottom: 12, color: "#94a3b8" }}>
-      <strong style={{ color: "#e5e7eb" }}>주소: </strong>
-      {post.address || "주소 정보 없음"}
+        <strong style={{ color: "#e5e7eb" }}>주소: </strong>
+        {post.address || "주소 정보 없음"}
       </div>
 
       {/* 내용 */}
@@ -290,7 +299,7 @@ export default function PostView() {
         {post.content}
       </div>
 
-      {/* 이미지 영역 (기존) */}
+      {/* 이미지 영역 */}
       <div style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong>이미지</strong>
@@ -368,7 +377,13 @@ export default function PostView() {
                 <img
                   src={img.imageUrl}
                   alt="이미지 썸네일"
-                  style={{ width: 120, height: 80, objectFit: "cover", display: "block", borderRadius: 7 }}
+                  style={{
+                    width: 120,
+                    height: 80,
+                    objectFit: "cover",
+                    display: "block",
+                    borderRadius: 7,
+                  }}
                   loading="lazy"
                 />
               </button>
@@ -379,7 +394,7 @@ export default function PostView() {
 
       <hr className="detail-separator" style={{ marginTop: 18 }} />
 
-      {/* ✅ 댓글 섹션 (추가) */}
+      {/* ✅ 댓글 섹션 (기존 그대로) */}
       <div className="replies-section">
         <h3>댓글 ({replies.length})</h3>
 
@@ -407,19 +422,24 @@ export default function PostView() {
         </div>
       </div>
 
-      {/* 하단 버튼 (기존) */}
+      {/* ✅ 하단 버튼 */}
       <div className="form-actions" style={{ marginTop: 24 }}>
         <Link className="form-btn btn-cancel" to={`/board/${boardType}`}>
           목록
         </Link>
 
-        <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
-          수정
-        </Link>
+        {/* ✅ 로그인 전에는 수정/삭제 버튼 숨김 */}
+        {isLoggedIn && (
+          <>
+            <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
+              수정
+            </Link>
 
-        <button className="form-btn btn-submit" onClick={onDelete}>
-          삭제
-        </button>
+            <button className="form-btn btn-submit" onClick={onDelete}>
+              삭제
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
