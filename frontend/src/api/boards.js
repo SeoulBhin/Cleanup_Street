@@ -67,8 +67,10 @@ export function addReplyLike(replyId) {
    ✅ 댓글 신고
    (이 경로는 서버 라우터에 따라 달라질 수 있음)
 ========================= */
-export function reportReply(replyId) {
-  return postJSON(`/api/report/comment/${replyId}`);
+export function reportReply(replyId, reason) {
+  return postJSON(`/api/report/comment/${replyId}`, {
+    reason, // ✅ 서버가 기대하는 필드명
+  });
 }
 // 댓글 수정
 export function updateReply(replyId, content) {
