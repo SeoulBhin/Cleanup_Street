@@ -1027,35 +1027,40 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     white-space: nowrap;
     height: 40px;
 }
-/* 알림 버튼 css*/
-.notification-wrapper-inline {
-    position: relative; 
-    display: inline-flex; 
-    align-items: center;
-    margin-right: 15px; /* 환영 메시지와의 간격 확보 */
+/* 알림기능 css */
+.header-title-section {
+    display: flex;
+    align-items: center; /* 제목과 아이콘을 수직 중앙 정렬 */
+    gap: 10px; /* 제목과 아이콘 사이 간격 */
 }
 
-/* 2. 알림 아이콘 버튼 스타일 */
-.notification-icon-container-inline {
+/* 알림 아이콘과 드롭다운을 묶는 컨테이너 */
+.notification-wrapper {
+    position: relative; /* 드롭다운 위치의 기준점 */
+    display: inline-block;
+}
+
+/* 1. 알림 아이콘 버튼 스타일 */
+.notification-icon-container {
     background: none;
     border: none;
     color: white; /* Header 배경색에 맞춰 흰색으로 설정 */
     cursor: pointer;
     position: relative; /* 배지 위치의 기준점 */
     padding: 5px;
+    margin-left: 5px;
     transition: color 0.2s;
+    /* 아이콘 크기 제어 및 중앙 정렬 */
     display: inline-flex;
     align-items: center; 
     justify-content: center;
-    position: relative;
-    z-index: 1002; 
 }
-.notification-icon-container-inline:hover {
+.notification-icon-container:hover {
     color: #facc15; /* 마우스 오버 시 강조색으로 변경 */
 }
 
-/* 3. 읽지 않은 알림 개수를 표시하는 배지 */
-.notification-badge-inline {
+/* 2. 읽지 않은 알림 개수를 표시하는 배지 */
+.notification-badge {
     position: absolute;
     top: 0;
     right: 0;
@@ -1075,11 +1080,11 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     transform: translate(50%, -50%); 
 }
 
-/* 4. 알림 드롭다운 창 스타일 */
+/* 3. 알림 드롭다운 창 스타일 */
 .notification-dropdown {
     position: absolute;
     top: 100%; /* 아이콘 바로 아래에 위치 */
-    right: 0; /* 아이콘 오른쪽 정렬 (notification-wrapper-inline 기준) */
+    right: 0; /* 아이콘 오른쪽 정렬 */
     width: 350px; /* 창 너비 */
     max-height: 400px; /* 최대 높이 */
     overflow-y: auto;
@@ -1088,7 +1093,7 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     border: 1px solid #ddd;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1001; /* 버튼보다 낮지만 다른 요소보다 높게 */
+    z-index: 1001; 
     margin-top: 10px; /* 아이콘과의 간격 */
     color: #333;
     animation: fadeInModal 0.2s ease-out; 
@@ -1110,7 +1115,7 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     margin: 0;
 }
 
-/* 5. 알림 항목 스타일 */
+/* 4. 알림 항목 스타일 */
 .dropdown-item {
     padding: 10px 15px;
     border-bottom: 1px solid #f0f0f0;
@@ -1124,7 +1129,7 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
     background-color: #f7f7f7;
 }
 
-/* 6. 읽지 않은 알림 시각적 구분 */
+/* 5. 읽지 않은 알림 시각적 구분 */
 .dropdown-item.unread {
     background-color: #e3f2fd; /* 연한 파란색 배경으로 강조 */
     font-weight: 600;
