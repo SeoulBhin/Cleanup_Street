@@ -56,13 +56,7 @@ export default function PostView() {
 
       // 2) 댓글 불러오기 (서버 확정 라우트)
       const r = await listReplies(boardType, id);
-      const normalized = Array.isArray(r)
-      ? r.map((x) => ({
-          ...x,
-          id: x.id ?? x.comment_id ?? x.commentId,
-        }))
-      : [];
-    setReplies(normalized);
+      setReplies(Array.isArray(r) ? r : []);
     } catch (err) {
       console.error("게시글/댓글 불러오기 실패:", err);
       setLoadError("LOAD_FAIL");
