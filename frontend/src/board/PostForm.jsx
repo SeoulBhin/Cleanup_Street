@@ -8,7 +8,6 @@ import {
 } from "../api/boards";
 import { uploadFiles } from "../api/uploads";
 import { createImagePreview } from "../api/previews";
-import { FORUM_CATEGORIES } from "./categories";
 
 export default function PostForm() {
   const { boardType, id } = useParams();
@@ -17,7 +16,7 @@ export default function PostForm() {
 
   const [form, setForm] = useState({
     title: "",
-    category: FORUM_CATEGORIES[0],
+    category: "기타",
     content: "",
     // 실제 저장용으로 보내지 않음(프라이버시), 프리뷰 생성만 사용
     attachments: [],
@@ -57,7 +56,7 @@ export default function PostForm() {
       .then((p) =>
         setForm({
           title: p.title || "",
-          category: p.category || FORUM_CATEGORIES[0],
+          category: p.category || "기타",
           content: p.content || "",
           attachments: (p.images || []).map((img) => img.imageUrl) || [],
           address: p.address || "",
