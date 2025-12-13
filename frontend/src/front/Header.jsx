@@ -25,7 +25,7 @@ export default function Header({ onLogoClick }) {
     
     // 로그인 전 UI (폼 + 로그인/회원가입 버튼)
     const LoggedOutView = () => (
-        <>
+         <>
             <button className="btn btn-login" onClick={openLoginModal}>
                 로그인
             </button>
@@ -36,16 +36,19 @@ export default function Header({ onLogoClick }) {
     );
 
     // 로그인 후 UI (환영 메시지 + 로그아웃 버튼)
-    const LoggedInView = () => (
-        <>
-            <span className="welcome-message">
-                {userInfo?.username ? `${userInfo.username}님 반갑습니다!` : '사용자님 반갑습니다!'}
-            </span>
-            <button className="btn btn-login" onClick={handleLogout}>
-                로그아웃
-            </button>
-        </>
-    );
+      const LoggedInView = () => {
+        const name = userInfo?.displayName || userInfo?.username || '사용자';
+        return (
+            <>
+                <span className="welcome-message">
+                    {name}님 반갑습니다!
+                </span>
+                <button className="btn btn-login" onClick={handleLogout}>
+                    로그아웃
+                </button>
+            </>
+        );
+    };
 
 
     return (
@@ -60,3 +63,4 @@ export default function Header({ onLogoClick }) {
         </header>
     );
 }
+//
