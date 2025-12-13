@@ -7,7 +7,7 @@ const h3 = require("h3-js");
 const path = require("path");
 const fs = require("fs/promises");
 const crypto = require("crypto");
-const { requireAuth } = require("../middlewares/auth"); 
+const { requireAuth } = require("../middleware/auth"); 
 
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 
