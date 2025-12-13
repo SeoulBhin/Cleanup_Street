@@ -42,13 +42,7 @@ const BUILD_DIR = path.join(__dirname, "..", "frontend", "build");
 // 업로드 / 임시 / 갤러리 폴더
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 const TMP_DIR = path.join(__dirname, "tmp");
-const GALLERY_DIR = path.join(
-  __dirname,
-  "..",
-  "frontend",
-  "public",
-  "gallery"
-);
+const GALLERY_DIR = path.join(__dirname, "..", "frontend", "public", "gallery");
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -177,25 +171,24 @@ const CHAT_SQL = {
 
 // ========================= node/src 라우터 & 미들웨어 =========================
 
-const { requireAuth } = require("./middleware/auth");
+const { requireAuth }      = require("./middleware/auth");
 
-const authRoutes = require("./routes/auth");
-const reportRoutes = require("./routes/report");
-const commentRoutes = require("./routes/comment.router");
-const legacyPostsRouter = require("./routes/posts.router");
-const recoveryRoutes = require("./routes/recovery");
-const alertsRoutes = require("./routes/alerts");
-const postReactionRoutes = require("./routes/post.reaction.router");
-const googleOAuth = require("./routes/oauth.google");
-const naverOAuth = require("./routes/oauth.naver");
-const kakaoOAuth = require("./routes/oauth.kakao");
+const authRoutes           = require("./routes/auth");
+const reportRoutes         = require("./routes/report");
+const commentRoutes        = require("./routes/comment.router");
+const legacyPostsRouter    = require("./routes/posts.router");
+const recoveryRoutes       = require("./routes/recovery");
+const alertsRoutes         = require("./routes/alerts");
+const postReactionRoutes   = require("./routes/post.reaction.router");
+const googleOAuth          = require("./routes/oauth.google");
+const naverOAuth           = require("./routes/oauth.naver");
+const kakaoOAuth           = require("./routes/oauth.kakao");
 
-const imagePreviewRoutes = require("./routes/image-previews");
-const mosaicPostsRouter = require("./routes/posts"); // /api/posts
-// 🔥 새로 추가된 라우터
-const boardPostsRouter = require("./routes/board-posts");
-const uploadUrlRouter = require("./routes/uploads.url");
-
+const imagePreviewRoutes   = require("./routes/image-previews");
+const mosaicPostsRouter    = require("./routes/posts");   // /api/posts
+// 🔥 새로 추가해야 하는 라우터
+const boardPostsRouter   = require("./routes/board-posts");
+const uploadUrlRouter    = require("./routes/uploads.url");
 // ========================= 앱 / 서버 / 소켓 =========================
 
 const app = express();
@@ -206,12 +199,10 @@ const io = new Server(server, {
     credentials: true,
   },
 });
+// ===== Redis Adapter 설정 =====
+const { createAdapter } = require("@socket.io/redis-adapter");
+const { createClient } = require("redis");
 
-// ===== Redis Adapter 설정 (로컬에서는 미사용 → 주석) =====
-// const { createAdapter } = require("@socket.io/redis-adapter");
-// const { createClient } = require("redis");
-
-/*
 (async () => {
   try {
     const pubClient = createClient({ url: REDIS_URL });
@@ -235,7 +226,7 @@ const io = new Server(server, {
     console.error("❌ Redis Adapter init failed:", err?.message || err);
   }
 })();
-*/
+
 
 // ========================= 글로벌 미들웨어 =========================
 
@@ -257,13 +248,12 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // === 정적 파일 ===
-app.use("/uploads", express.static(UPLOAD_DIR)); // 업로드 파일
-app.use("/gallery", express.static(GALLERY_DIR)); // 갤러리 원본 이미지
-app.use(express.static(BUILD_DIR)); // React build
+app.use("/uploads", express.static(UPLOAD_DIR));   // 업로드 파일
+app.use("/gallery", express.static(GALLERY_DIR));  // 갤러리 원본 이미지
+app.use(express.static(BUILD_DIR));                // React build
 
 console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
 console.log("🔥 Loaded KAKAO KEY:", process.env.KAKAO_REST_API_KEY_Value);
-
 // 헬스 체크
 app.get("/health", async (_, res) => {
   let redisStatus = "unknown";
@@ -281,7 +271,6 @@ app.get("/health", async (_, res) => {
 app.get("/api/hello", (req, res) => {
   res.status(200).json({ message: "cleanup street backend alive" });
 });
-
 // ========================= 공지 / 갤러리 API =========================
 
 app.get("/api/announcements", (req, res) => {
@@ -309,42 +298,12 @@ app.get("/api/announcements", (req, res) => {
 
 app.get("/api/gallery", (req, res) => {
   res.json([
-    {
-      id: 1,
-      url: "/gallery/1.png",
-      caption: "고장난 가로등 신고 후 수리",
-      roomId: "gallery-1",
-    },
-    {
-      id: 2,
-      url: "/gallery/2.png",
-      caption: "도로 파손 정비 전/후",
-      roomId: "gallery-2",
-    },
-    {
-      id: 3,
-      url: "/gallery/3.png",
-      caption: "공원 쓰레기 정리 캠페인",
-      roomId: "gallery-3",
-    },
-    {
-      id: 4,
-      url: "/gallery/4.png",
-      caption: "불법 투기 단속 현장",
-      roomId: "gallery-4",
-    },
-    {
-      id: 5,
-      url: "/gallery/5.png",
-      caption: "커뮤니티 합동 정화 활동",
-      roomId: "gallery-5",
-    },
-    {
-      id: 6,
-      url: "/gallery/6.png",
-      caption: "깨끗해진 벤치 주변",
-      roomId: "gallery-6",
-    },
+    { id: 1, url: "/gallery/1.png", caption: "고장난 가로등 신고 후 수리", roomId: "gallery-1" },
+    { id: 2, url: "/gallery/2.png", caption: "도로 파손 정비 전/후",       roomId: "gallery-2" },
+    { id: 3, url: "/gallery/3.png", caption: "공원 쓰레기 정리 캠페인",     roomId: "gallery-3" },
+    { id: 4, url: "/gallery/4.png", caption: "불법 투기 단속 현장",         roomId: "gallery-4" },
+    { id: 5, url: "/gallery/5.png", caption: "커뮤니티 합동 정화 활동",     roomId: "gallery-5" },
+    { id: 6, url: "/gallery/6.png", caption: "깨끗해진 벤치 주변",           roomId: "gallery-6" },
   ]);
 });
 
@@ -360,16 +319,16 @@ app.get("/api/me", requireAuth, (req, res) => res.json({ me: req.user }));
 // ========================= 게시글 / 댓글 / 좋아요 / 알림 / 신고 =========================
 
 app.use("/api/legacy-posts", legacyPostsRouter);
-app.use("/api/posts", mosaicPostsRouter);
+app.use("/api/posts",        mosaicPostsRouter);
 
-app.use("/api/alerts", alertsRoutes);
-app.use("/api", postReactionRoutes);
-app.use("/api", commentRoutes);
-app.use("/api/report", reportRoutes);
+app.use("/api/alerts",   alertsRoutes);
+app.use("/api",          postReactionRoutes);
+app.use("/api",          commentRoutes);
+app.use("/api/report",   reportRoutes);
 app.use("/api/recovery", recoveryRoutes);
 
 app.use("/api/image-previews", imagePreviewRoutes);
-// 게시판(board-posts) 라우터
+// 🔥 게시판(board-posts) 라우터 추가
 app.use("/api/board-posts", boardPostsRouter);
 // 외부 URL → 업로드 파일 저장 라우터
 app.use("/api/uploads/url", uploadUrlRouter);
@@ -391,7 +350,7 @@ app.get("/api/uploads", (_req, res) => {
 app.options("/api/uploads", cors()); // 명시적 preflight 허용
 app.post(
   "/api/uploads",
-  // requireAuth,   // 필요 시 다시 활성화
+  // requireAuth,   // ⛔ 잠깐 주석 처리 (또는 삭제)
   upload.array("files", 10),
   (req, res) => {
     const ct = req.headers["content-type"] || "";
@@ -403,10 +362,9 @@ app.post(
     if (!req.files || !req.files.length) {
       return res.status(400).json({ message: "No files received" });
     }
-
     const proto = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.headers["x-forwarded-host"] || req.get("host");
-    const base = `${proto}://${host}`;
+    const host  = req.headers["x-forwarded-host"] || req.get("host");
+    const base  = `${proto}://${host}`;
     const urls = (req.files || []).map(
       (f) => `${base}/uploads/${path.basename(f.path)}`
     );
@@ -414,7 +372,6 @@ app.post(
     res.json({ urls });
   }
 );
-
 // ========================= 게시판(boards) 조회 전용 =========================
 
 app.get("/api/boards/:boardType", async (req, res, next) => {
@@ -463,27 +420,9 @@ app.put("/api/boards/:boardType/:id", requireAuth, async (req, res) => {
 
 app.get("/api/map", async (req, res) => {
   const FALLBACK = [
-    {
-      id: 1,
-      title: "가로등 고장",
-      lat: 37.5665,
-      lng: 126.978,
-      h3_cell: "8a2a1072b59ffff",
-    },
-    {
-      id: 2,
-      title: "도로 파손",
-      lat: 37.57,
-      lng: 126.982,
-      h3_cell: "8a2a1072b5bffff",
-    },
-    {
-      id: 3,
-      title: "쓰레기 무단투기",
-      lat: 37.5635,
-      lng: 126.975,
-      h3_cell: "8a2a1072b5dffff",
-    },
+    { id: 1, title: "가로등 고장",      lat: 37.5665, lng: 126.9780, h3_cell: "8a2a1072b59ffff" },
+    { id: 2, title: "도로 파손",        lat: 37.5700, lng: 126.9820, h3_cell: "8a2a1072b5bffff" },
+    { id: 3, title: "쓰레기 무단투기",  lat: 37.5635, lng: 126.9750, h3_cell: "8a2a1072b5dffff" },
   ];
 
   try {
@@ -520,8 +459,10 @@ app.get("/api/map", async (req, res) => {
       ) img ON TRUE
       LEFT JOIN LATERAL (
         SELECT
+          -- 1) https?://...jpg|png|gif|webp
           COALESCE(
             (regexp_match(p.content, '(https?://[^\\s\\\"]+\\.(?:jpg|jpeg|png|gif|webp))'))[1],
+            -- 2) /uploads/ 로 시작하는 경로
             (regexp_match(p.content, '(/uploads/[^\\s\\\"]+\\.(?:jpg|jpeg|png|gif|webp))'))[1]
           ) AS url
       ) content_img ON TRUE
@@ -604,12 +545,38 @@ io.on("connection", (socket) => {
         }
       }
 
-      // 최근 메시지 로딩 로직은 필요 시 주석 해제
+      // 필요하면 최근 메시지 불러오기 (프론트에서 msg:init 처리 필요)
+      /*
+      if (hasNumericRoomId) {
+        try {
+          const { rows } = await db.query(CHAT_SQL.LOAD_RECENT_MESSAGES, [
+            numericRoomId,
+            50, // limit
+            0,  // offset
+          ]);
+
+          socket.emit(
+            "msg:init",
+            rows.map((r) => ({
+              id: r.message_id,
+              roomId: r.room_id,
+              userId: r.sender_id,
+              text: r.content,
+              ts: r.created_at,
+              from: r.sender_id,
+            }))
+          );
+        } catch (err) {
+          console.error("LOAD_RECENT_MESSAGES error:", err);
+        }
+      }
+      */
     } catch (err) {
       console.error("join handler error:", err);
     }
   });
 
+  // 기존 room:join / room:leave (원하면 프론트에서 사용)
   socket.on("room:join", (roomId) => {
     if (!roomId) return;
     const roomKey = String(roomId);
@@ -624,6 +591,7 @@ io.on("connection", (socket) => {
     console.log(`room:leave → ${socket.id} left ${roomKey}`);
   });
 
+  // 안 읽은 메시지 읽음 처리 (프론트에서 emit("read_messages", { roomId }) 사용 중)
   socket.on("read_messages", async ({ roomId, userId }) => {
     try {
       if (!roomId) return;
@@ -631,6 +599,7 @@ io.on("connection", (socket) => {
       const numericRoomId = Number(roomId);
       const hasNumericRoomId = !Number.isNaN(numericRoomId);
 
+      // 아직 읽음 상태를 저장하는 테이블이 없다면, 일단 로그만 찍도록
       console.log(
         `👀 read_messages: roomId=${roomId}, userId=${userId || "anonymous"}`
       );
@@ -639,22 +608,19 @@ io.on("connection", (socket) => {
     }
   });
 
+  // 공통 브로드캐스트 함수
   const broadcast = async ({ roomId, text, ts, userId }) => {
     try {
       if (!roomId || !text) return;
 
-      const roomKey = String(roomId);
+      const roomKey = String(roomId); // 실제 소켓 방 이름
       const numericRoomId = Number(roomId);
       const hasNumericRoomId = !Number.isNaN(numericRoomId);
 
       let saved = null;
-
-      console.log(
-        `📤 broadcast: room=${roomKey}, msg="${text}" from ${
-          userId || socket.id
-        }`
-      );
-
+      
+    console.log(`📤 broadcast: room=${roomKey}, msg="${text}" from ${userId || socket.id}`);
+      // roomId가 숫자 + userId 있을 때만 DB에 저장
       if (userId && hasNumericRoomId) {
         try {
           const { rows } = await db.query(CHAT_SQL.INSERT_MESSAGE, [
@@ -669,13 +635,16 @@ io.on("connection", (socket) => {
       }
 
       const payload = {
+        // 숫자로 되는 방은 number, 그 외는 문자열로 유지
         roomId: hasNumericRoomId ? numericRoomId : roomKey,
         text,
         ts: saved ? saved.created_at : ts || Date.now(),
         userId,
-        from: userId || socket.id,
+        from: userId || socket.id, // 프론트에서는 from === "me"로 본인/상대 구분
       };
 
+      // 같은 방의 "다른" 클라이언트에게만 전송
+      // (본인은 프론트에서 logs에 직접 push)
       socket.to(roomKey).emit("msg", payload);
       console.log(
         `💬 broadcast to ${roomKey} from ${
@@ -687,9 +656,11 @@ io.on("connection", (socket) => {
     }
   };
 
+  // 프론트에서 emit("msg", payload) / emit("chat:send", payload) 둘 다 지원
   socket.on("msg", broadcast);
   socket.on("chat:send", broadcast);
 
+  // 연결 종료
   socket.on("disconnect", (reason) => {
     console.log(`❌ socket disconnected: ${socket.id}, reason: ${reason}`);
   });
@@ -700,15 +671,13 @@ io.on("connection", (socket) => {
 app.use((req, res, next) => {
   if (req.method !== "GET") return next();
   if (req.path.startsWith("/socket.io")) return next();
-  if (req.path.startsWith("/api/")) return next();
-  if (req.path.startsWith("/tiles/")) return next();
+  if (req.path.startsWith("/api/"))      return next();
+  if (req.path.startsWith("/tiles/"))    return next();
   res.sendFile(path.join(BUILD_DIR, "index.html"));
 });
 
 app.use((req, res) => {
-  res
-    .status(404)
-    .json({ message: "Not Found", path: req.originalUrl || req.url });
+  res.status(404).json({ message: "Not Found", path: req.originalUrl || req.url });
 });
 
 app.use((err, req, res, _next) => {
@@ -722,3 +691,6 @@ app.use((err, req, res, _next) => {
 server.listen(PORT, () => {
   console.log(`API & Socket server running on http://localhost:${PORT}`);
 });
+
+
+
