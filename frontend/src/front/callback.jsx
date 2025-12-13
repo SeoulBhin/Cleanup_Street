@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthModal } from "../contexts/AuthModalContext";
 
 function parseHash(hash) {
-  // hash: "#provider=naver&token=xxx"
   const h = (hash || "").replace(/^#/, "");
   return Object.fromEntries(new URLSearchParams(h));
 }
@@ -19,23 +18,20 @@ export default function OAuthCallback() {
     const provider = params.provider;
 
     if (!token) {
-      // 토큰 없으면 그냥 홈
       navigate("/", { replace: true });
       return;
     }
 
-    // ✅ 토큰 저장
     localStorage.setItem("accessToken", token);
 
-    // ✅ 로그인 상태 반영 (Header가 즉시 로그인 UI로 바뀜)
     handleLoginSuccess({
-      user: {
-        username: provider ? `${provider} 로그인` : "사용자",
-      },
+      user: { username: provider ? `${provider} 로그인` : "사용자" },
       token,
     });
 
-    // ✅ hash 제거 + 홈 이동
+    // ✅ hash 제거(토큰 흔적 제거) -> 이후에 다시 콜백 페이지로 와도 재처리 방지
+    window.history.replaceState(null, "", "/");
+
     navigate("/", { replace: true });
   }, [location.hash, navigate, handleLoginSuccess]);
 
