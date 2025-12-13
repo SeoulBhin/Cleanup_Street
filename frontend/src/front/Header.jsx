@@ -8,7 +8,7 @@ export default function Header({ onLogoClick }) {
     if (!context) {
         return (
             <header className="app-header">
-                <h1>와챠우! (Watch out!)</h1>
+                <h1>와챠웃! (Watch out!)</h1>
                 <div className="login-section">인증 시스템 로딩 중...</div>
             </header>
         );
@@ -51,7 +51,7 @@ export default function Header({ onLogoClick }) {
     return (
         <header className="app-header">
             <h1 onClick={onLogoClick} style={{ userSelect: "none" }}>
-                와챠우! (Watch out!)
+                와챠웃! (Watch out!)
             </h1>
             <div className="login-section">
                 {/* Context 상태에 따른 조건부 렌더링 */}
