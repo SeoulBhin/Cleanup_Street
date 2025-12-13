@@ -11,48 +11,30 @@ export function getPost(id) {
   return getJSON(`/api/posts/${id}`);
 }
 
-/**
- * 게시글 생성
- * - KoBERT 자동 분류(autoCategory) 기본 사용
- * - category를 넘기면: 수동 카테고리 우선, autoCategory=true이면 KoBERT 결과로 덮어쓸 수 있음(백엔드 로직에 따름)
- * - previewId / selectedVariant / address / attachments 전송
- */
+/** 게시글 생성 (모자이크 미리보기 제거됨) */
 export function createPost({
   userId = 1,
   title,
   content,
-  category = null,        // 사용자가 고른 카테고리(없으면 null)
-  address = null, 
+  category,
   latitude = null,
   longitude = null,
   h3Index = null,
-  attachments = [],       // 원본/추가 이미지 URL 배열
-  autoCategory = true,    // 기본값: 자동 분류 사용
-  previewId = null,       // 이미지 미리보기 ID
-  selectedVariant = "AUTO", // "AUTO" | "PLATE_VISIBLE"
-  address = null,         // 도로명 주소(카카오/네이버 검색 값)
+  attachments = [],
 }) {
   return postJSON(`/api/posts`, {
     userId,
     title,
     postBody: content,
     category,
-    address, 
     latitude,
     longitude,
     h3Index,
     attachments,
-    autoCategory,      // KoBERT 호출 플래그
-    previewId,
-    selectedVariant,
-    address,
   });
 }
 
-/** 게시글 수정
- *  - body는 PostForm 등에서 그대로 구성해서 넘기는 방식 유지
- *  - (title, postBody, category, latitude, longitude, h3Index, previewId, address, attachments 등)
- */
+/** 게시글 수정 */
 export function updatePost(id, body) {
   return putJSON(`/api/posts/${id}`, body);
 }
