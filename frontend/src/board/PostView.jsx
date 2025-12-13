@@ -272,6 +272,11 @@ export default function PostView() {
         >
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
+        
+      </div>
+      <div style={{ marginBottom: 12, color: "#94a3b8" }}>
+      <strong style={{ color: "#e5e7eb" }}>주소: </strong>
+      {post.address || "주소 정보 없음"}
       </div>
 
       {/* 내용 */}
