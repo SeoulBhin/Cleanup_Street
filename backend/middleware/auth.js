@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const BYPASS_AUTH = process.env.BYPASS_AUTH === 'true';
 exports.requireAuth = (req, res, next) => {
   try {
-
+    /*
     // =======================
     // 🔥 1) 테스트 모드라면 바로 통과
     // =======================
@@ -19,7 +19,7 @@ exports.requireAuth = (req, res, next) => {
       return next();
     }
     // =======================
-    
+    */
     const authHeader = req.headers['authorization'];
     if (!authHeader) return res.status(401).json({ message: '토큰 필요' });
 
