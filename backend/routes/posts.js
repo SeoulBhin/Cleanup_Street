@@ -2,7 +2,6 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // pg 래퍼 (db.query)
-const fetch = require("node-fetch");
 const h3 = require("h3-js");
 const path = require("path");
 const fs = require("fs/promises");
@@ -10,6 +9,70 @@ const crypto = require("crypto");
 const { requireAuth } = require("../middleware/auth");
 
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
+
+// =========================
+// KoBERT 호출 (자동 분류)
+// =========================
+const KOBERT_URL = process.env.KOBERT_URL;
+const KOBERT_ENABLED = !!KOBERT_URL;
+
+const ALLOWED_CATEGORIES = new Set([
+  "도로-교통",
+  "시설물-건축",
+  "치안-범죄위험",
+  "자연재난-환경",
+  "위생-보건",
+  "기타",
+  "스팸",
+]);
+
+function normalizeCategory(raw) {
+  if (!raw || typeof raw !== "string") return null;
+
+  let s = raw.trim();
+  s = s.replace(/\s+/g, "");     // 공백 제거
+  s = s.replace(/[·ㆍ]/g, "-");  // 중점류 → -
+  s = s.replace(/_/g, "-");
+
+  if (s === "자연-재난환경") s = "자연재난-환경";
+  if (s === "자연재난환경") s = "자연재난-환경";
+
+  return s;
+}
+
+async function classifyByKoBERT(text) {
+  if (!KOBERT_ENABLED) return null;
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 10000);
+
+  try {
+    const res = await globalThis.fetch(KOBERT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: ac.signal,
+    });
+
+    if (!res.ok) throw new Error(`KoBERT ${res.status}`);
+
+    const data = await res.json();
+    const picked =
+      data?.category ||
+      data?.label ||
+      data?.result?.category ||
+      data?.result?.label ||
+      null;
+
+    const norm = normalizeCategory(picked);
+    if (!norm) return null;
+
+    return ALLOWED_CATEGORIES.has(norm) ? norm : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 
 function resolveUploadPath(url) {
   if (!url || typeof url !== "string") return null;
@@ -37,7 +100,7 @@ async function persistImageToUploads(selectedImageUrl, req, variant = "AUTO") {
       else if (ct.includes("gif")) ext = ".gif";
       buf = Buffer.from(b64, "base64");
     } else {
-      const res = await fetch(selectedImageUrl);
+      const res = await globalThis.fetch(selectedImageUrl);
       if (!res.ok) throw new Error(`fetch ${res.status}`);
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("png")) ext = ".png";
@@ -79,7 +142,7 @@ async function deleteLocalUpload(url) {
 // ================== 공통 SELECT ==================
 const BASE_SELECT = `
   SELECT
-    p.post_id,
+    p.post_id      AS id,
     p.user_id,
     p.title,
     p.content,
@@ -87,11 +150,12 @@ const BASE_SELECT = `
     p.status,
     p.comment_count,
     p.h3_index::text AS h3_index,
+    p.address,
     p.latitude,
     p.longitude,
     p.created_at,
     p.updated_at,
-    ST_AsText(p.location) AS location_wkt,
+    ST_AsText(p.location::geometry) AS location_wkt,
     COALESCE(
       (
         SELECT json_agg(
@@ -111,6 +175,7 @@ const BASE_SELECT = `
   FROM posts p
 `;
 
+
 // 단일 게시글 조회 함수
 async function fetchPostById(postId) {
   const query = `${BASE_SELECT} WHERE p.post_id = $1`;
@@ -126,7 +191,7 @@ async function geocodeNaver(address) {
     encodeURIComponent(address.trim());
 
   try {
-    const res = await fetch(url, {
+    const res = await globalThis.fetch(url, {
       headers: {
         "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_CLIENT_ID_Map,
         "X-NCP-APIGW-API-KEY": process.env.NAVER_CLIENT_SECRET_Map,
@@ -179,9 +244,11 @@ router.get("/", async (req, res) => {
 
 // GET a single post by ID
 router.get("/:postId", async (req, res) => {
-  const { postId } = req.params;
+  const id = Number(req.params.postId);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "BAD_POST_ID" });
+
   try {
-    const post = await fetchPostById(postId);
+    const post = await fetchPostById(id);
     if (!post) return res.status(404).json({ error: "Post not found" });
     res.json(post);
   } catch (err) {
@@ -190,50 +257,109 @@ router.get("/:postId", async (req, res) => {
   }
 });
 
+
 // ================== 새 글 작성 (주소 + 지도/H3 포함) ==================
 router.post("/", requireAuth, async (req, res) => {
-  // ✅ userId는 토큰에서만 결정 (프론트 userId 무시)
-  const userId = req.user.id;
+  const userId = Number(req.user?.id ?? req.user?.user_id);
+  if (!Number.isFinite(userId)) {
+    return res.status(401).json({ error: "UNAUTHORIZED" });
+  }
 
   const {
     title,
+    content,
     postBody,
     category,
-    latitude,
-    longitude,
-    h3Index,
-    previewId,
+    autoCategory = false,
+    latitude = null,
+    longitude = null,
+    h3Index = null,
+    previewId = null,
     address,
+    attachments = [],
+    selectedVariant = "AUTO",
   } = req.body;
 
-  if (!title || !postBody || !category) {
-    return res.status(400).json({ error: "Missing required fields" });
+  const finalContent = (content ?? postBody ?? "").toString();
+  if (!title || !finalContent) {
+    return res.status(400).json({
+      error: "Missing required fields",
+      code: "MISSING_FIELDS",
+      message: "필수 값 누락 (title / content)",
+    });
   }
 
   try {
-    let lat = latitude;
-    let lng = longitude;
-    let h3Idx = h3Index;
+    // 1) category 기본값 + KoBERT 옵션
+    let finalCategory = (category ?? "").toString().trim() || "기타";
 
-    if ((!lat || !lng) && address && address.trim()) {
-      const geo = await geocodeNaver(address);
-      if (geo) {
-        lat = geo.lat;
-        lng = geo.lng;
-        if (!h3Idx && lat && lng) {
-          h3Idx = h3.latLngToCell(lat, lng, 8);
-        }
-      } else {
-        console.warn("[POSTS] geocode failed for address:", address);
+    if (autoCategory === true && KOBERT_ENABLED) {
+      try {
+        const predicted = await classifyByKoBERT(`${title}\n${finalContent}`);
+        if (predicted) finalCategory = predicted;
+      } catch {
+        // KoBERT 실패 시 기존 finalCategory 유지
       }
     }
 
-    if (lat !== null && lat !== undefined) lat = Number(lat);
-    if (lng !== null && lng !== undefined) lng = Number(lng);
+    const norm = normalizeCategory(finalCategory);
+    finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
 
-    const location = lat && lng ? `SRID=4326;POINT(${lng} ${lat})` : null;
+    // 2) 좌표/주소 처리 (Number.isFinite 기반)
+    let lat = latitude;
+    let lng = longitude;
+    let resolvedAddress = (address || "").trim() || null;
 
-    let previewData = null;
+    if (lat !== null && lat !== undefined && lat !== "") lat = Number(lat);
+    else lat = null;
+    if (lng !== null && lng !== undefined && lng !== "") lng = Number(lng);
+    else lng = null;
+
+    // 좌표가 없고 주소가 있으면 네이버 지오코딩
+    if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && resolvedAddress) {
+      const geo = await geocodeNaver(resolvedAddress);
+      if (geo) {
+        lat = geo.lat;
+        lng = geo.lng;
+        resolvedAddress = geo.roadAddress || resolvedAddress;
+      }
+    }
+
+    const hasCoord = Number.isFinite(lat) && Number.isFinite(lng);
+    const location = hasCoord ? `SRID=4326;POINT(${lng} ${lat})` : null;
+
+    // 3) h3Index 결정 (프론트가 주면 우선, 없으면 생성)
+    let h3Idx = h3Index;
+    if (!h3Idx && hasCoord) {
+      h3Idx = h3.latLngToCell(lat, lng, 8);
+    }
+
+    // 4) posts INSERT (address 포함)
+    const insertQuery = `
+      INSERT INTO posts (
+        user_id, title, content, category,
+        address, location, h3_index, status,
+        latitude, longitude, created_at, updated_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'DONE',$8,$9,NOW(),NOW())
+      RETURNING post_id AS id;
+    `;
+
+    const { rows } = await db.query(insertQuery, [
+      userId,
+      title,
+      finalContent,
+      finalCategory,
+      resolvedAddress,
+      location,
+      h3Idx,
+      hasCoord ? lat : null,
+      hasCoord ? lng : null,
+    ]);
+
+    const newPostId = rows[0].id;
+
+    // 5) previewId → 모자이크 이미지 저장(기존 로직 유지)
     if (previewId) {
       const previewResult = await db.query(
         "SELECT original_image_url, auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
@@ -242,52 +368,19 @@ router.post("/", requireAuth, async (req, res) => {
       if (previewResult.rows.length === 0) {
         return res.status(400).json({ error: "Invalid previewId provided." });
       }
-      previewData = previewResult.rows[0];
-    }
 
-    const insertQuery = `
-      INSERT INTO posts (
-        user_id, title, content, category,
-        location, h3_index, status,
-        latitude, longitude, created_at, updated_at
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())
-      RETURNING post_id;
-    `;
-
-    const status = "DONE";
-    const insertValues = [
-      userId,
-      title,
-      postBody,
-      category,
-      location,
-      h3Idx,
-      status,
-      lat,
-      lng,
-    ];
-
-    const { rows } = await db.query(insertQuery, insertValues);
-    const newPostId = rows[0].post_id;
-
-    if (previewData) {
-      const selectedVariant =
-        req.body.selectedVariant === "PLATE_VISIBLE" ? "PLATE_VISIBLE" : "AUTO";
+      const previewData = previewResult.rows[0];
+      const variant = selectedVariant === "PLATE_VISIBLE" ? "PLATE_VISIBLE" : "AUTO";
       const selectedImageRaw =
-        selectedVariant === "PLATE_VISIBLE"
+        variant === "PLATE_VISIBLE"
           ? previewData.plate_visible_image
           : previewData.auto_mosaic_image;
 
-      const selectedImage = await persistImageToUploads(
-        selectedImageRaw,
-        req,
-        selectedVariant
-      );
+      const selectedImage = await persistImageToUploads(selectedImageRaw, req, variant);
 
       await db.query(
         `INSERT INTO post_images (post_id, image_url, variant) VALUES ($1,$2,$3);`,
-        [newPostId, selectedImage, selectedVariant]
+        [newPostId, selectedImage, variant]
       );
 
       await db.query(
@@ -295,166 +388,247 @@ router.post("/", requireAuth, async (req, res) => {
         [previewId]
       );
 
+      // 선택하지 않은 미리보기/원본 정리 + preview row 삭제
       const deleteTargets = [];
       const originalUrl = previewData.original_image_url;
-      if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
+      if (variant === "AUTO" && previewData.plate_visible_image) {
         deleteTargets.push(previewData.plate_visible_image);
       }
-      if (selectedVariant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
+      if (variant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
         deleteTargets.push(previewData.auto_mosaic_image);
       }
       if (originalUrl) deleteTargets.push(originalUrl);
+
       await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
-      await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
-        previewId,
-      ]);
+      await db.query("DELETE FROM image_previews WHERE preview_id = $1", [previewId]);
+    }
+
+    // 6) attachments (원본 첨부) → post_images에 ORIGINAL로 저장
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const params = [newPostId];
+      const values = attachments.map((url, idx) => {
+        params.push(url);
+        return `($1, $${idx + 2}, 'ORIGINAL')`;
+      });
+
+      await db.query(
+        `INSERT INTO post_images (post_id, image_url, variant) VALUES ${values.join(",")}`,
+        params
+      );
     }
 
     const createdPost = await fetchPostById(newPostId);
-    res.status(201).json(createdPost);
+    return res.status(201).json(createdPost);
   } catch (err) {
     console.error("Failed to create post", err);
-    res.status(500).json({ error: "Failed to create post" });
+    return res.status(500).json({ error: "Failed to create post" });
   }
 });
 
+
 // ================== 글 수정 (작성자만) ==================
 router.put("/:postId", requireAuth, async (req, res) => {
-  const { postId } = req.params;
+  const postId = Number(req.params.postId);
+  if (!Number.isFinite(postId)) {
+    return res.status(400).json({ error: "BAD_POST_ID" });
+  }
+
+  const userId = Number(req.user?.id ?? req.user?.user_id);
+  if (!Number.isFinite(userId)) {
+    return res.status(401).json({ error: "UNAUTHORIZED" });
+  }
 
   const {
     title,
+    content,
     postBody,
     category,
-    latitude,
-    longitude,
-    h3Index,
-    previewId,
+    autoCategory = false,
+    latitude = null,
+    longitude = null,
+    h3Index = null,
+    previewId = null,
     address,
+    attachments = [],
+    selectedVariant = "AUTO",
   } = req.body;
 
-  if (!title || !postBody || !category) {
-    return res.status(400).json({ error: "Missing required fields" });
+  const finalContent = (content ?? postBody ?? "").toString();
+  if (!title || !finalContent) {
+    return res.status(400).json({
+      error: "Missing required fields",
+      code: "MISSING_FIELDS",
+      message: "필수 값 누락 (title / content)",
+    });
   }
 
   try {
-    // ✅ 소유권 체크
+    // 0) 소유권 체크
     const existing = await fetchPostById(postId);
     if (!existing) return res.status(404).json({ error: "Post not found" });
 
-    if (Number(existing.user_id) !== Number(req.user.id)) {
+    if (Number(existing.user_id) !== userId) {
       return res.status(403).json({ error: "FORBIDDEN", code: "NOT_AUTHOR" });
     }
 
-    let lat = latitude;
-    let lng = longitude;
-    let h3Idx = h3Index;
+    // 1) category 기본값 + KoBERT 옵션
+    let finalCategory = (category ?? "").toString().trim() || "기타";
 
-    if ((!lat || !lng) && address && address.trim()) {
-      const geo = await geocodeNaver(address);
-      if (geo) {
-        lat = geo.lat;
-        lng = geo.lng;
-        if (!h3Idx && lat && lng) {
-          h3Idx = h3.latLngToCell(lat, lng, 8);
-        }
-      } else {
-        console.warn("[POSTS][UPDATE] geocode failed for address:", address);
+    if (autoCategory === true && KOBERT_ENABLED) {
+      try {
+        const predicted = await classifyByKoBERT(`${title}\n${finalContent}`);
+        if (predicted) finalCategory = predicted;
+      } catch {
+        // KoBERT 실패 시 기존 finalCategory 유지
       }
     }
 
-    if (lat !== null && lat !== undefined) lat = Number(lat);
-    if (lng !== null && lng !== undefined) lng = Number(lng);
+    const norm = normalizeCategory(finalCategory);
+    finalCategory = norm && ALLOWED_CATEGORIES.has(norm) ? norm : "기타";
 
-    const location = lat && lng ? `SRID=4326;POINT(${lng} ${lat})` : null;
+    // 2) 좌표/주소 처리 (Number.isFinite 기반)
+    let lat = latitude;
+    let lng = longitude;
+    let resolvedAddress = (address || "").trim() || null;
 
+    if (lat !== null && lat !== undefined && lat !== "") lat = Number(lat);
+    else lat = null;
+
+    if (lng !== null && lng !== undefined && lng !== "") lng = Number(lng);
+    else lng = null;
+
+    // 좌표가 없고 주소가 있으면 네이버 지오코딩
+    if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && resolvedAddress) {
+      const geo = await geocodeNaver(resolvedAddress);
+      if (geo) {
+        lat = geo.lat;
+        lng = geo.lng;
+        resolvedAddress = geo.roadAddress || resolvedAddress;
+      }
+    }
+
+    const hasCoord = Number.isFinite(lat) && Number.isFinite(lng);
+    const location = hasCoord ? `SRID=4326;POINT(${lng} ${lat})` : null;
+
+    // 3) h3Index 결정 (프론트가 주면 우선, 없으면 생성)
+    let h3Idx = h3Index;
+    if (!h3Idx && hasCoord) {
+      h3Idx = h3.latLngToCell(lat, lng, 8);
+    }
+
+    // 4) posts UPDATE (address 포함)
     const updateQuery = `
       UPDATE posts
       SET
-        title=$2, content=$3, category=$4,
-        location=$5, h3_index=$6,
-        latitude=$7, longitude=$8,
-        updated_at=NOW()
-      WHERE post_id=$1
-      RETURNING post_id;
+        title      = $2,
+        content    = $3,
+        category   = $4,
+        address    = $5,
+        location   = $6,
+        h3_index   = $7,
+        latitude   = $8,
+        longitude  = $9,
+        updated_at = NOW()
+      WHERE post_id = $1
+      RETURNING post_id AS id;
     `;
 
-    const updateValues = [
+    const upd = await db.query(updateQuery, [
       postId,
       title,
-      postBody,
-      category,
+      finalContent,
+      finalCategory,
+      resolvedAddress,
       location,
       h3Idx,
-      lat,
-      lng,
-    ];
+      hasCoord ? lat : null,
+      hasCoord ? lng : null,
+    ]);
 
-    const { rows } = await db.query(updateQuery, updateValues);
-    if (!rows.length) return res.status(404).json({ error: "Post not found" });
+    if (!upd.rowCount) return res.status(404).json({ error: "Post not found" });
 
-    // previewId 처리 (너 기존 로직 유지)
+    // 5) attachments 누적 방지: ORIGINAL만 정리 후 재삽입
+    if (attachments && Array.isArray(attachments)) {
+      await db.query(
+        `DELETE FROM post_images WHERE post_id = $1 AND variant = 'ORIGINAL'`,
+        [postId]
+      );
+
+      if (attachments.length > 0) {
+        const params = [postId];
+        const values = attachments.map((url, idx) => {
+          params.push(url);
+          return `($1, $${idx + 2}, 'ORIGINAL')`;
+        });
+
+        await db.query(
+          `INSERT INTO post_images (post_id, image_url, variant)
+           VALUES ${values.join(",")}`,
+          params
+        );
+      }
+    }
+
+    // 6) previewId(새 미리보기 선택) 처리
     if (previewId) {
+      // (선택) 모자이크 누적 방지: 기존 AUTO/PLATE_VISIBLE 정리
+      await db.query(
+        `DELETE FROM post_images WHERE post_id = $1 AND variant IN ('AUTO','PLATE_VISIBLE')`,
+        [postId]
+      );
+
       const previewResult = await db.query(
         "SELECT original_image_url, auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
         [previewId]
       );
 
-      if (previewResult.rows.length) {
-        const previewData = previewResult.rows[0];
-        const selectedVariant =
-          req.body.selectedVariant === "PLATE_VISIBLE"
-            ? "PLATE_VISIBLE"
-            : "AUTO";
-
-        const selectedImageRaw =
-          selectedVariant === "PLATE_VISIBLE"
-            ? previewData.plate_visible_image
-            : previewData.auto_mosaic_image;
-
-        const selectedImage = await persistImageToUploads(
-          selectedImageRaw,
-          req,
-          selectedVariant
-        );
-
-        await db.query(
-          `INSERT INTO post_images (post_id, image_url, variant) VALUES ($1,$2,$3);`,
-          [postId, selectedImage, selectedVariant]
-        );
-
-        await db.query(
-          "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
-          [previewId]
-        );
-
-        const deleteTargets = [];
-        const originalUrl = previewData.original_image_url;
-        if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
-          deleteTargets.push(previewData.plate_visible_image);
-        }
-        if (
-          selectedVariant === "PLATE_VISIBLE" &&
-          previewData.auto_mosaic_image
-        ) {
-          deleteTargets.push(previewData.auto_mosaic_image);
-        }
-        if (originalUrl) deleteTargets.push(originalUrl);
-        await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
-
-        await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
-          previewId,
-        ]);
+      if (previewResult.rows.length === 0) {
+        return res.status(400).json({ error: "Invalid previewId provided." });
       }
+
+      const previewData = previewResult.rows[0];
+      const variant = selectedVariant === "PLATE_VISIBLE" ? "PLATE_VISIBLE" : "AUTO";
+      const selectedImageRaw =
+        variant === "PLATE_VISIBLE"
+          ? previewData.plate_visible_image
+          : previewData.auto_mosaic_image;
+
+      const selectedImage = await persistImageToUploads(selectedImageRaw, req, variant);
+
+      await db.query(
+        `INSERT INTO post_images (post_id, image_url, variant) VALUES ($1,$2,$3);`,
+        [postId, selectedImage, variant]
+      );
+
+      await db.query(
+        "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
+        [previewId]
+      );
+
+      // 선택하지 않은 미리보기/원본 정리 + preview row 삭제
+      const deleteTargets = [];
+      const originalUrl = previewData.original_image_url;
+
+      if (variant === "AUTO" && previewData.plate_visible_image) {
+        deleteTargets.push(previewData.plate_visible_image);
+      }
+      if (variant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
+        deleteTargets.push(previewData.auto_mosaic_image);
+      }
+      if (originalUrl) deleteTargets.push(originalUrl);
+
+      await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
+      await db.query("DELETE FROM image_previews WHERE preview_id = $1", [previewId]);
     }
 
     const updatedPost = await fetchPostById(postId);
-    res.json(updatedPost);
+    return res.json(updatedPost);
   } catch (err) {
     console.error("Failed to update post", err);
-    res.status(500).json({ error: "Failed to update post" });
+    return res.status(500).json({ error: "Failed to update post" });
   }
 });
+
 
 // ================== 글 삭제 (작성자만) ==================
 router.delete("/:postId", requireAuth, async (req, res) => {
