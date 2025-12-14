@@ -41,15 +41,41 @@ function normalizeCategory(raw) {
   if (!raw || typeof raw !== "string") return null;
 
   let s = raw.trim();
-  s = s.replace(/\s+/g, "");
-  s = s.replace(/[·ㆍ]/g, "-");
-  s = s.replace(/_/g, "-");
 
-  if (s === "자연-재난환경") s = "자연재난-환경";
-  if (s === "자연재난환경") s = "자연재난-환경";
+  // 1) 공백/구분자 통일
+  s = s.replace(/\s+/g, "");      // 모든 공백 제거
+  s = s.replace(/[·ㆍ]/g, "-");   // 가운데점 → 하이픈
+  s = s.replace(/_/g, "-");       // 언더스코어 → 하이픈
 
+  // 2) 자주 나올 수 있는 변형들을 보정
+  // 도로-교통
+  if (s === "도로교통") s = "도로-교통";
+
+  // 시설물-건축
+  if (s === "시설물건축") s = "시설물-건축";
+
+  // 치안-범죄위험
+  if (s === "치안" || s === "치안범죄위험" || s === "치안-범죄") {
+    s = "치안-범죄위험";
+  }
+
+  // 자연재난-환경
+  if (
+    s === "자연재난환경" ||
+    s === "자연재난" ||
+    s === "자연환경" ||
+    s === "자연-재난환경"
+  ) {
+    s = "자연재난-환경";
+  }
+
+  // 위생-보건
+  if (s === "위생보건") s = "위생-보건";
+
+  // 나머지는 그대로 반환
   return s;
 }
+
 
 async function classifyByKoBERT(text) {
   if (!KOBERT_ENABLED) return null;
