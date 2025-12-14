@@ -156,10 +156,13 @@ export default function ReplyItem({
           )}
 
           <div className="reply-actions">
-            <button className={`btn-reply-action ${isLiked ? "active" : ""}`} onClick={handleReplyLike} disabled={isEditing}>
+            {/*}<button className={`btn-reply-action ${isLiked ? "active" : ""}`} 
+             onClick={handleReplyLike}
+             disabled={isEditing}
+             >
               {isLiked ? "❤️" : "🤍"} {likesCount}
             </button>
-
+            */}
             <button className="btn-reply-action btn-report-sm" onClick={handleReplyReport} disabled={isEditing}>
               🚨 신고
             </button>
