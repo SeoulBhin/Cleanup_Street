@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { listBoardPosts, deleteBoardPost } from "../api/boards";
 import { FORUM_CATEGORIES } from "./categories";
+import { getMe } from "../api/auth"; 
+
 
 export default function BoardList() {
   const { boardType } = useParams();
   const [sp, setSp] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+   const [me, setMe] = useState(null);
 
   const q = sp.get("q") || "";
   const selected = sp.get("cat") || "전체";
@@ -24,7 +27,7 @@ export default function BoardList() {
     try {
         const list = await listBoardPosts(boardType, q);
         
-        // 수정된 부분: list가 배열인지 확인하고, 아니면 빈 배열을 사용합니다.
+        // 💡 수정된 부분: list가 배열인지 확인하고, 아니면 빈 배열을 사용합니다.
         const safeList = Array.isArray(list) ? list : []; 
         setRows(safeList);
         
@@ -39,6 +42,15 @@ export default function BoardList() {
     fetchList();
     // eslint-disable-next-line
   }, [boardType, q]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    getMe()
+      .then((r) => setMe(r?.me))
+      .catch(() => setMe(null));
+  }, []);
 
   const onSearch = (e) => {
     e.preventDefault();
