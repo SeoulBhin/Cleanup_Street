@@ -127,7 +127,6 @@ def classify(req: ClassifyReq):
 
         if cat not in CATEGORIES:
             raise ValueError(f"예상치 못한 카테고리 응답: {raw!r} -> {cat!r}")
-        print("[CLASSIFY]", cat)
         return {"category": cat}
 
     except Exception as e:
