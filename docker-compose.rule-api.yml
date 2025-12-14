@@ -1,0 +1,11 @@
+services:
+  rule-api:
+    build:
+      context: ./datatest/rule_api
+      dockerfile: Dockerfile
+    container_name: cleanup-rule-api
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
