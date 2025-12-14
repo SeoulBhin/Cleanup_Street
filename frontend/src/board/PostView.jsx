@@ -8,7 +8,7 @@ import {
   listReplies,
   submitReply,
   getPostLikeState,
-  reportPost, // ✅ 추가
+  reportPost,
 } from "../api/boards";
 
 import ReplyItem from "./ReplyItem";
@@ -37,9 +37,6 @@ export default function PostView() {
     id !== "new" &&
     !Number.isNaN(Number(id));
 
-  // --------------------------
-  // ✅ 게시글 + 댓글 같이 불러오기
-  // --------------------------
   const fetchDetail = useCallback(async () => {
     if (!isValidId) {
       setLoading(false);
@@ -51,15 +48,11 @@ export default function PostView() {
       setLoading(true);
       setLoadError(null);
 
-      // 1) 게시글 불러오기
       const p = await getBoardPost(boardType, id);
       setPost(p);
       setSelectedImageId(null);
-
-      // 서버가 is_liked_by_me 내려주면 초기 좋아요 상태 세팅
       setIsLiked(!!p?.is_liked_by_me);
 
-      // 2) 댓글 불러오기
       const r = await listReplies(boardType, id);
       const normalized = Array.isArray(r)
         ? r.map((x) => ({
@@ -69,16 +62,13 @@ export default function PostView() {
         : [];
       setReplies(normalized);
 
-      // ✅ 좋아요 상태/개수 DB 기준으로 덮어쓰기 (추가)
       try {
         if (isLoggedIn) {
           const s = await getPostLikeState(id);
           setIsLiked(!!s?.liked);
           setPost((prev) => (prev ? { ...prev, likes: s?.likes ?? 0 } : prev));
         }
-      } catch {
-        // 401 등 무시
-      }
+      } catch {}
     } catch (err) {
       console.error("게시글/댓글 불러오기 실패:", err);
       setLoadError("LOAD_FAIL");
@@ -93,7 +83,6 @@ export default function PostView() {
     fetchDetail();
   }, [fetchDetail]);
 
-  // == ADD: 내 정보 불러오기 ==
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
@@ -103,9 +92,6 @@ export default function PostView() {
       .catch(() => setMe(null));
   }, []);
 
-  // --------------------------
-  // ✅ 게시글 좋아요 토글
-  // --------------------------
   const handleLike = async () => {
     if (!isLoggedIn) {
       alert("로그인이 필요합니다.");
@@ -117,31 +103,27 @@ export default function PostView() {
     const wasLiked = isLiked;
     const delta = wasLiked ? -1 : 1;
 
-    // 낙관적 업데이트
     setIsLiked(!wasLiked);
-    setPost((prev) => (prev ? { ...prev, likes: (prev.likes || 0) + delta } : prev));
+    setPost((prev) =>
+      prev ? { ...prev, likes: (prev.likes || 0) + delta } : prev
+    );
 
     try {
       const res = await addLike(boardType, id);
       setIsLiked(!!res?.liked);
-
-      // (선택) 토글 API가 likes를 안 내려줘도
-      // fetchDetail에서 like-state로 덮어쓰기 되니까 문제 없음
     } catch (err) {
       console.error("좋아요 실패:", err);
 
-      // 롤백
       setIsLiked(wasLiked);
-      setPost((prev) => (prev ? { ...prev, likes: (prev.likes || 0) - delta } : prev));
+      setPost((prev) =>
+        prev ? { ...prev, likes: (prev.likes || 0) - delta } : prev
+      );
 
       if (err?.status === 401) alert("로그인이 필요합니다.");
       else alert("좋아요 처리에 실패했습니다.");
     }
   };
 
-  // --------------------------
-  // ✅ 게시글 신고 (추가)
-  // --------------------------
   const handleReportPost = async () => {
     if (!isLoggedIn) {
       alert("로그인이 필요합니다.");
@@ -168,9 +150,6 @@ export default function PostView() {
     }
   };
 
-  // --------------------------
-  // ✅ 댓글 작성
-  // --------------------------
   const handleReplySubmit = async (e) => {
     e.preventDefault();
     const text = newReplyText.trim();
@@ -187,9 +166,6 @@ export default function PostView() {
     }
   };
 
-  // --------------------------
-  // ✅ 삭제 기능
-  // --------------------------
   const onDelete = async () => {
     if (!isValidId) return;
     if (!window.confirm("정말 삭제할까요?")) return;
@@ -201,9 +177,6 @@ export default function PostView() {
     navigate(`/board/${boardType}`);
   };
 
-  // --------------------------
-  // ✅ 잘못된 ID 처리
-  // --------------------------
   if (!isValidId) {
     return (
       <div className="page-container fade-in">
@@ -217,9 +190,6 @@ export default function PostView() {
     );
   }
 
-  // --------------------------
-  // 로딩 / 에러 화면
-  // --------------------------
   if (loading) return <div className="page-container">불러오는 중...</div>;
 
   if (loadError && !post) {
@@ -240,12 +210,10 @@ export default function PostView() {
 
   if (!post) return <div className="page-container">게시글 정보가 없습니다.</div>;
 
-  // 작성자 판별
   const myId = me ? Number(me.id ?? me.user_id ?? me.userId) : null;
   const ownerId = Number(post.user_id ?? post.author_id ?? post.userId ?? post.userId);
   const isOwner = myId !== null && ownerId === myId;
 
-  // 이미지 처리 로직 (원본 유지)
   const images = Array.isArray(post.images) ? post.images : [];
   const attachments = Array.isArray(post.attachments) ? post.attachments : [];
 
@@ -320,14 +288,13 @@ export default function PostView() {
         </span>
       </div>
 
-      {/* ✅ 좋아요 + 신고 버튼 */}
       <div className="post-actions-detail" style={{ marginBottom: 12 }}>
         <button className={`btn-action ${isLiked ? "active" : ""}`} onClick={handleLike}>
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
 
         <button
-          className="btn-reply-action btn-report"
+          className="btn-action btn-report"
           onClick={handleReportPost}
           style={{ marginLeft: 8 }}
         >
@@ -344,7 +311,6 @@ export default function PostView() {
         {post.content}
       </div>
 
-      {/* 이미지 영역 (원본 그대로) */}
       <div style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong>이미지</strong>
@@ -439,7 +405,6 @@ export default function PostView() {
 
       <hr className="detail-separator" style={{ marginTop: 18 }} />
 
-      {/* ✅ 댓글 섹션 */}
       <div className="replies-section">
         <h3>댓글 ({replies.length})</h3>
 
@@ -461,13 +426,17 @@ export default function PostView() {
             <p className="no-replies">아직 댓글이 없습니다.</p>
           ) : (
             replies.map((reply) => (
-              <ReplyItem key={reply.id} reply={reply} onActionSuccess={fetchDetail} />
+              <ReplyItem
+                key={reply.id}
+                reply={reply}
+                me={me}                 
+                onActionSuccess={fetchDetail}
+              />
             ))
           )}
         </div>
       </div>
 
-      {/* ✅ 하단 버튼 */}
       <div className="form-actions" style={{ marginTop: 24 }}>
         <Link className="form-btn btn-cancel" to={`/board/${boardType}`}>
           목록

@@ -1,12 +1,7 @@
 import React, { useMemo, useState } from "react";
-import {
-  addReplyLike,
-  reportReply,
-  updateReply,
-  deleteReply,
-} from "../api/boards";
+import { addReplyLike, reportReply, updateReply, deleteReply } from "../api/boards";
 
-export default function ReplyItem({ reply, onActionSuccess }) {
+export default function ReplyItem({ reply, onActionSuccess, me }) {
   const replyId = useMemo(
     () => reply.id ?? reply.comment_id ?? reply.commentId,
     [reply]
@@ -19,12 +14,16 @@ export default function ReplyItem({ reply, onActionSuccess }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(reply.content || "");
 
-  // (선택) 내 댓글만 수정/삭제 보이게 하려면 서버에서 is_mine 같은 값 내려주는 게 베스트
-  const canEdit = reply.is_mine === true; // 없으면 일단 false / 또는 true로 테스트
+  // ✅ 내 댓글만 수정/삭제 가능 (서버 수정 없이 프론트에서 판별)
+  const myId = Number(me?.id ?? me?.user_id ?? me?.userId);
+  const authorId = Number(reply?.user_id ?? reply?.author_id ?? reply?.userId);
+  const canEdit =
+    Number.isFinite(myId) && Number.isFinite(authorId) && myId === authorId;
 
   const handleReplyLike = async () => {
     if (!replyId) return alert("댓글 ID 오류");
 
+    // 낙관적 업데이트
     setIsLiked((prev) => {
       setLikesCount((c) => (prev ? c - 1 : c + 1));
       return !prev;
@@ -46,18 +45,18 @@ export default function ReplyItem({ reply, onActionSuccess }) {
     if (!window.confirm("정말 이 댓글을 신고하시겠습니까?")) return;
 
     const reason = window.prompt("신고 사유를 입력하세요");
-if (!reason || !reason.trim()) return;
+    if (!reason || !reason.trim()) return;
 
-try {
-  await reportReply(replyId, reason.trim());
-  alert("댓글 신고가 접수되었습니다.");
-  onActionSuccess?.();
+    try {
+      await reportReply(replyId, reason.trim());
+      alert("댓글 신고가 접수되었습니다.");
+      onActionSuccess?.();
     } catch (e) {
-  console.error("댓글 신고 실패:", e);
-  if (e?.status === 401) alert("로그인이 필요합니다.");
-  else alert("댓글 신고 처리에 실패했습니다.");
+      console.error("댓글 신고 실패:", e);
+      if (e?.status === 401) alert("로그인이 필요합니다.");
+      else alert("댓글 신고 처리에 실패했습니다.");
     }
-};
+  };
 
   // ✅ 수정 시작
   const startEdit = () => {
@@ -79,10 +78,11 @@ try {
     try {
       await updateReply(replyId, editText.trim());
       setIsEditing(false);
-      onActionSuccess?.(); // 목록 새로고침
+      onActionSuccess?.();
     } catch (e) {
       console.error("댓글 수정 실패:", e);
-      alert("댓글 수정에 실패했습니다.");
+      if (e?.status === 401) alert("로그인이 필요합니다.");
+      else alert("댓글 수정에 실패했습니다.");
     }
   };
 
@@ -96,16 +96,19 @@ try {
       onActionSuccess?.();
     } catch (e) {
       console.error("댓글 삭제 실패:", e);
-      alert("댓글 삭제에 실패했습니다.");
+      if (e?.status === 401) alert("로그인이 필요합니다.");
+      else alert("댓글 삭제에 실패했습니다.");
     }
   };
 
   return (
     <div className="reply-item">
       <div className="reply-meta">
-        <span className="reply-author">{reply.author || "익명"}</span>
+        <span className="reply-author">
+          {reply.author || reply.username || "익명"}
+        </span>
         <span className="reply-date">
-          {new Date(reply.created_at).toLocaleString()}
+          {reply.created_at ? new Date(reply.created_at).toLocaleString() : ""}
         </span>
       </div>
 
@@ -148,7 +151,7 @@ try {
           🚨 신고
         </button>
 
-        {/* ✅ 내 댓글일 때만 수정/삭제 노출 (테스트 중이면 canEdit 조건 제거해도 됨) */}
+        {/* ✅ 내 댓글만 수정/삭제 노출 */}
         {canEdit && !isEditing && (
           <>
             <button className="btn-reply-action" onClick={startEdit}>
