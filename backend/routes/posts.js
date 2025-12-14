@@ -61,7 +61,13 @@ ${String(text || "")}
       signal: ac.signal,
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 20 },
+        generationConfig: { temperature: 0, topP: 0, topK: 1, maxOutputTokens: 10, candidateCount: 1 },
+        safetySettings: [
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ],
       }),
     });
 
@@ -82,7 +88,7 @@ ${String(text || "")}
 
     const picked = pickFirstLine(raw);
     if (!picked.trim()) {
-      console.warn("[GEMINI] empty response");
+      console.warn("[GEMINI] empty response", { raw });
       return null;
     }
 
