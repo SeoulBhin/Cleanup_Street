@@ -158,7 +158,7 @@ export default function RightMap() {
                       <div className="map-popup-body">
                         <h3>{item.title || "제목 없음"}</h3>
                         <p className="map-popup-meta">
-                          입력 주소: {item.address || "미입력"}
+                          주소: {item.address || "미입력"}
                         </p>
                         <p className="map-popup-meta">
                           위도: {lat.toFixed(6)}, 경도: {lng.toFixed(6)}
