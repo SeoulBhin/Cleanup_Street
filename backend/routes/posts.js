@@ -22,16 +22,79 @@ async function fetchCompat(url, options) {
 }
 
 // =========================
-// KoBERT 호출 (자동 분류)
+// Gemini 호출 (자동 분류)
 // =========================
-const KOBERT_URL = process.env.KOBERT_URL; // http://127.0.0.1:7014/classify
-const KOBERT_ENABLED = !!process.env.KOBERT_URL;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-// 🔍 서버 시작 시 환경 상태 로그
-console.log("[POSTS][INIT_KOBERT]", {
-  KOBERT_URL,
-  KOBERT_ENABLED,
+console.log("[POSTS][INIT_GEMINI]", {
+  enabled: !!GEMINI_API_KEY,
+  model: GEMINI_MODEL,
 });
+
+async function classifyByGemini(text) {
+  if (!GEMINI_API_KEY) return null;
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 10000);
+
+  try {
+    const prompt = `
+당신은 한국어 민원/제보 글을 7개 카테고리 중 하나로 분류하는 모델입니다.
+아래 라벨 중 하나만, 한 줄로 그대로 출력하세요. 추가 설명/기호/따옴표/JSON 금지.
+라벨: 도로-교통, 시설물-건축, 치안-범죄위험, 자연재난-환경, 위생-보건, 기타, 스팸
+
+[입력]
+${String(text || "")}
+    `.trim();
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      GEMINI_MODEL
+    )}:generateContent`;
+
+    const res = await fetchCompat(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+      },
+      signal: ac.signal,
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 20 },
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "");
+      console.warn("[GEMINI] bad status:", res.status, bodyText.slice(0, 200));
+      return null;
+    }
+
+    const data = await res.json();
+    const raw =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+      data?.candidates?.[0]?.content?.parts
+        ?.map((p) => p?.text)
+        .filter(Boolean)
+        .join("\n") ??
+      "";
+
+    const picked = pickFirstLine(raw);
+    if (!picked.trim()) return null;
+
+    const norm = normalizeCategory(picked);
+    console.log("[GEMINI] response <-", { raw: picked, norm });
+
+    if (!norm) return null;
+    return ALLOWED_CATEGORIES.has(norm) ? norm : null;
+  } catch (e) {
+    console.warn("[GEMINI] classify failed:", e?.message || e);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const ALLOWED_CATEGORIES = new Set([
   "도로-교통",
@@ -354,11 +417,17 @@ router.post("/", requireAuth, async (req, res) => {
     // 3) location
     const location = hasCoord ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
+    const wantAuto = autoCategory !== false;
     const requested = normalizeCategory(category);
     let finalCategory = null;
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
+      const g = await classifyByGemini(text);
+
+      finalCategory = g || null;
+
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g });
 
     }
 
@@ -373,7 +442,8 @@ router.post("/", requireAuth, async (req, res) => {
       wantAuto,
       requested,
       finalCategory,
-
+      GEMINI_ENABLED: !!GEMINI_API_KEY,
+      GEMINI_MODEL,
     });
 
 
@@ -548,7 +618,9 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-
+      const g = await classifyByGemini(text);
+      finalCategory = g || null;
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g });
     }
 
     if (!finalCategory) {
