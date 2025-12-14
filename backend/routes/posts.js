@@ -88,23 +88,23 @@ async function classifyByGemini(text) {
       "도로-교통\n시설물-건축\n치안-범죄위험\n자연재난-환경\n위생-보건\n기타\n스팸\n\n" +
       "[입력]\n" + String(text || "");
 
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        GEMINI_MODEL
-      )}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+  GEMINI_MODEL
+)}:generateContent`;
 
     const res = await fetchCompat(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+      },
       signal: ac.signal,
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0,
-          maxOutputTokens: 20,
-        },
+        generationConfig: { temperature: 0, maxOutputTokens: 20 },
       }),
     });
+
 
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
