@@ -55,15 +55,17 @@ export default function PostView() {
 
       const r = await listReplies(boardType, id);
 
-      // ✅✅ ADD: user_id별 익명 1,2... 매핑 + parentId 통일 + replies 배열 준비
-      const anonMap = new Map();
+      // ✅ ADD: user_id별 익명 1,2... 매핑
+      const anonMap = new Map(); // userId -> number
       let seq = 0;
 
       const normalized = Array.isArray(r)
         ? r.map((x) => {
             const cid = x.id ?? x.comment_id ?? x.commentId;
 
-            const uid = Number(x.user_id ?? x.userId ?? x.author_id ?? x.authorId);
+            const uid = Number(
+              x.user_id ?? x.userId ?? x.author_id ?? x.authorId
+            );
 
             let displayAuthor = "익명";
             if (Number.isFinite(uid)) {
@@ -71,45 +73,15 @@ export default function PostView() {
               displayAuthor = `익명 ${anonMap.get(uid)}`;
             }
 
-            // ✅✅ ADD: parentId 필드 흡수 (백엔드 필드명 다를 수 있어서 최대한 커버)
-            const parentId =
-              x.parent_id ??
-              x.parentId ??
-              x.parent_comment_id ??
-              x.parentCommentId ??
-              x.parent ??
-              null;
-
             return {
               ...x,
               id: cid,
-              displayAuthor,
-              parentId,     // ✅✅ ADD
-              replies: [],  // ✅✅ ADD (트리용)
+              displayAuthor, // ✅ ReplyItem에서 이걸로만 표시하게 할거임
             };
           })
         : [];
 
-      // ✅✅ ADD: flat -> tree 변환 (여기가 핵심)
-      const byId = new Map();
-      normalized.forEach((c) => {
-        if (c?.id != null) byId.set(c.id, c);
-      });
-
-      const roots = [];
-      normalized.forEach((c) => {
-        const pid = c.parentId;
-
-        // 부모가 존재하면 부모 replies에 push, 아니면 최상위로
-        if (pid != null && pid !== 0 && byId.has(pid)) {
-          byId.get(pid).replies.push(c);
-        } else {
-          roots.push(c);
-        }
-      });
-
-      // ✅✅ CHANGE: setReplies(normalized) -> setReplies(roots)
-      setReplies(roots);
+      setReplies(normalized);
 
       try {
         if (isLoggedIn) {
@@ -146,13 +118,16 @@ export default function PostView() {
       alert("로그인이 필요합니다.");
       return;
     }
+
     if (!post) return;
 
     const wasLiked = isLiked;
     const delta = wasLiked ? -1 : 1;
 
     setIsLiked(!wasLiked);
-    setPost((prev) => (prev ? { ...prev, likes: (prev.likes || 0) + delta } : prev));
+    setPost((prev) =>
+      prev ? { ...prev, likes: (prev.likes || 0) + delta } : prev
+    );
 
     try {
       const res = await addLike(boardType, id);
@@ -161,7 +136,9 @@ export default function PostView() {
       console.error("좋아요 실패:", err);
 
       setIsLiked(wasLiked);
-      setPost((prev) => (prev ? { ...prev, likes: (prev.likes || 0) - delta } : prev));
+      setPost((prev) =>
+        prev ? { ...prev, likes: (prev.likes || 0) - delta } : prev
+      );
 
       if (err?.status === 401) alert("로그인이 필요합니다.");
       else alert("좋아요 처리에 실패했습니다.");
@@ -173,10 +150,12 @@ export default function PostView() {
       alert("로그인이 필요합니다.");
       return;
     }
+
     if (!isValidId) {
       alert("게시글 ID 오류");
       return;
     }
+
     if (!window.confirm("정말 이 게시글을 신고하시겠습니까?")) return;
 
     const reason = window.prompt("신고 사유를 입력하세요");
@@ -198,7 +177,7 @@ export default function PostView() {
     if (!text) return;
 
     try {
-      await submitReply(boardType, id, text);
+      await submitReply(boardType, id, text); // ✅ 일반 댓글
       setNewReplyText("");
       await fetchDetail();
     } catch (err) {
@@ -256,6 +235,64 @@ export default function PostView() {
   const ownerId = Number(post.user_id ?? post.author_id ?? post.userId ?? post.userId);
   const isOwner = myId !== null && ownerId === myId;
 
+  const images = Array.isArray(post.images) ? post.images : [];
+  const attachments = Array.isArray(post.attachments) ? post.attachments : [];
+
+  const extractImageUrls = (text) => {
+    if (!text || typeof text !== "string") return [];
+    const urls = [];
+
+    const roughUrl = /(https?:\/\/\S+)/gi;
+    let match;
+    while ((match = roughUrl.exec(text)) !== null) urls.push(match[1]);
+
+    const uploadsRegex = /(\/uploads\/\S+)/gi;
+    while ((match = uploadsRegex.exec(text)) !== null) urls.push(match[1]);
+
+    const cleaned = [];
+    const seen = new Set();
+    for (const url of urls) {
+      const stripped = url.replace(/[)>,\]]+$/, "");
+      if (!/\.(jpg|jpeg|png|gif|webp)(\?|#|$)/i.test(stripped)) continue;
+      if (seen.has(stripped)) continue;
+      seen.add(stripped);
+      cleaned.push(stripped);
+    }
+    return cleaned;
+  };
+
+  const contentImages = extractImageUrls(post.content);
+  const normalizedImages = images.map((img) => ({
+    ...img,
+    variant: (img.variant || "").toUpperCase(),
+  }));
+  const hasProcessed = normalizedImages.length > 0;
+
+  const attachmentImages = [...attachments, ...contentImages].reduce(
+    (acc, url) => {
+      if (!url || acc.seen.has(url)) return acc;
+      acc.seen.add(url);
+      acc.list.push({
+        imageUrl: url,
+        variant: "ORIGINAL",
+        imageId: `attachment-${acc.list.length}`,
+      });
+      return acc;
+    },
+    { seen: new Set(), list: [] }
+  ).list;
+
+  const gallerySources = hasProcessed ? normalizedImages : attachmentImages;
+
+  const selected =
+    gallerySources.find((img) => {
+      if (selectedImageId === null) return false;
+      return img.imageId === selectedImageId;
+    }) || null;
+
+  const defaultImage = gallerySources[0] || null;
+  const activeImage = selected || defaultImage;
+
   return (
     <div className="page-container fade-in">
       <h2 className="page-title" style={{ border: "none", paddingBottom: 0 }}>
@@ -282,8 +319,70 @@ export default function PostView() {
         </button>
       </div>
 
+      <div style={{ marginBottom: 12, color: "#94a3b8" }}>
+        <strong style={{ color: "#e5e7eb" }}>주소: </strong>
+        {post.address || "주소 정보 없음"}
+      </div>
+
       <div className="post-content" style={{ whiteSpace: "pre-wrap" }}>
         {post.content}
+      </div>
+
+      {/* 이미지 영역 생략(원본 유지) */}
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <strong>이미지</strong>
+          {!hasProcessed && !!attachments.length && (
+            <span
+              style={{
+                fontSize: 12,
+                padding: "2px 8px",
+                borderRadius: 12,
+                background: "#f97316",
+                color: "#fff",
+              }}
+            >
+              처리 중 (원본 미리보기)
+            </span>
+          )}
+        </div>
+
+        {activeImage ? (
+          <div style={{ marginTop: 12 }}>
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 960,
+                borderRadius: 16,
+                overflow: "hidden",
+                border: "1px solid #e5e7eb",
+                background: "#0f172a",
+              }}
+            >
+              <img
+                src={activeImage.imageUrl}
+                alt="게시 이미지"
+                style={{
+                  width: "100%",
+                  minHeight: 320,
+                  maxHeight: 640,
+                  objectFit: "contain",
+                  display: "block",
+                  background: "#0f172a",
+                }}
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23232a3b'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%237884ab' font-size='20'%3E이미지를 불러올 수 없습니다%3C/text%3E%3C/svg%3E";
+                }}
+              />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
+              {activeImage.createdAt ? new Date(activeImage.createdAt).toLocaleString() : ""}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 12, color: "#94a3b8" }}>표시할 이미지가 없습니다.</div>
+        )}
       </div>
 
       <hr className="detail-separator" style={{ marginTop: 18 }} />
