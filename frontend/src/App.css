@@ -454,8 +454,8 @@ body {
 }
 /* 자식 묶음 들여쓰기 */
 .reply-children {
-    margin-top: 0; /* 간격 축소 */
-    margin-left: 18px;
+    margin-top: 10; /* 간격 축소 */
+    margin-left: 0px;
 }
 .reply-reply-box {
     margin-top: 8px;
