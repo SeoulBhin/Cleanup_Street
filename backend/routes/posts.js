@@ -165,82 +165,6 @@ async function classifyByGemini(text) {
   }
 }
 
-// =========================
-// KoBERT 호출 (자동 분류)
-// =========================
-const KOBERT_URL = process.env.KOBERT_URL; // 예: http://127.0.0.1:7014/classify
-const KOBERT_ENABLED = !!process.env.KOBERT_URL;
-
-console.log("[POSTS][INIT_KOBERT]", {
-  KOBERT_URL,
-  KOBERT_ENABLED,
-});
-
-async function classifyByKoBERT(text) {
-  if (!KOBERT_ENABLED) {
-    console.log("[KoBERT] disabled: no KOBERT_URL env");
-    return null;
-  }
-
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 10000);
-
-  try {
-    console.log("[KoBERT] request ->", {
-      url: KOBERT_URL,
-      textPreview: String(text).slice(0, 50),
-    });
-
-    const res = await fetchCompat(KOBERT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-      signal: ac.signal,
-    });
-
-    if (!res.ok) {
-      const bodyText = await res.text().catch(() => "");
-      console.warn("[KoBERT] bad status:", res.status, bodyText);
-      return null;
-    }
-
-    const data = await res.json();
-
-    const picked =
-      data?.category ||
-      data?.label ||
-      data?.result?.category ||
-      data?.result?.label ||
-      null;
-
-    const norm = normalizeCategory(picked);
-
-    console.log("[KoBERT] response <-", { raw: picked, norm });
-
-    if (!norm) return null;
-    return ALLOWED_CATEGORIES.has(norm) ? norm : null;
-  } catch (e) {
-    console.warn("[KoBERT] classify failed:", e?.message || e);
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// =========================
-// 자동 분류 선택 로직: Gemini 우선 → KoBERT 폴백
-// =========================
-async function classifyAuto(text) {
-  // 1) Gemini
-  const g = await classifyByGemini(text);
-  if (g) return g;
-
-  // 2) KoBERT
-  const k = await classifyByKoBERT(text);
-  if (k) return k;
-
-  return null;
-}
 
 // =========================
 // uploads helpers
@@ -504,19 +428,20 @@ router.post("/", requireAuth, async (req, res) => {
     const location = hasCoord ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
     // 4) 자동 분류
-    const wantAuto = !!autoCategory;
+    // autoCategory가 false가 아닌 경우 자동 분류를 시도(기본 true)
+    const wantAuto = autoCategory !== false;
     const requested = normalizeCategory(category);
     let finalCategory = null;
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-      const predicted = await classifyAuto(text);
-      if (predicted) {
-        finalCategory = predicted;
-      } else {
-        const keywordCat = classifyByKeywords(title, postBody);
-        if (keywordCat) finalCategory = keywordCat;
-      }
+      const g = await classifyByGemini(text);
+      const k = g ? null : await classifyByKoBERT(text);
+      const kw = g || k ? null : classifyByKeywords(title, postBody);
+
+      finalCategory = g || k || kw || null;
+
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, k, kw });
     }
 
     if (!finalCategory) {
@@ -697,19 +622,19 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     const location = hasCoord ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
     // 카테고리
-    const wantAuto = !!autoCategory;
+    const wantAuto = autoCategory !== false;
     const requested = normalizeCategory(category);
     let finalCategory = null;
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-      const predicted = await classifyAuto(text);
-      if (predicted) {
-        finalCategory = predicted;
-      } else {
-        const keywordCat = classifyByKeywords(title, postBody);
-        if (keywordCat) finalCategory = keywordCat;
-      }
+      const g = await classifyByGemini(text);
+      const k = g ? null : await classifyByKoBERT(text);
+      const kw = g || k ? null : classifyByKeywords(title, postBody);
+
+      finalCategory = g || k || kw || null;
+
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, k, kw });
     }
 
     if (!finalCategory) {
