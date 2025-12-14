@@ -26,6 +26,8 @@ FROM public.ecr.aws/docker/library/nginx:alpine
 # 중요: 1단계(builder)에서 생성된 빌드 결과물(/app/build)만 가져와서
 # Nginx가 웹 페이지를 보여줄 수 있는 기본 경로로 복사합니다.
 COPY --from=builder /app/build /usr/share/nginx/html
+# SPA 라우팅을 위해 /gallery 경로에도 index.html을 둬서 403을 방지합니다.
+RUN mkdir -p /usr/share/nginx/html/gallery && cp /usr/share/nginx/html/index.html /usr/share/nginx/html/gallery/index.html
 
 # 사용자 정의 Nginx 설정 파일을 적용합니다.
 # (React 라우팅 처리를 위해 보통 필요한 설정입니다.)
