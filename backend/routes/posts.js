@@ -110,6 +110,7 @@ function normalizeCategory(raw) {
   if (!raw || typeof raw !== "string") return null;
 
   let s = raw.trim();
+  s = pickFirstLine(s);
 
   // 1) 공백/구분자 통일
   s = s.replace(/\s+/g, "");      // 모든 공백 제거
@@ -143,6 +144,10 @@ function normalizeCategory(raw) {
 
   // 나머지는 그대로 반환
   return s;
+}
+
+function pickFirstLine(raw) {
+  return String(raw || "").split(/\r?\n/)[0].trim();
 }
 
 
