@@ -69,8 +69,11 @@ export function listReplies(boardType, postId) {
   return getJSON(`/api/posts/${postId}/comments`);
 }
 
-export function submitReply(boardType, postId, content) {
-  return postJSON(`/api/posts/${postId}/comments`, { content });
+export function submitReply(boardType, postId, content, parentId = null) {
+  return postJSON(`/api/posts/${postId}/comments`, {
+    content,
+    parent_id: parentId, // ✅ 핵심: 백엔드가 받는 키 이름
+  });
 }
 
 /* =========================
