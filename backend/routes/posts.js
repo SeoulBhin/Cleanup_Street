@@ -8,6 +8,7 @@ const fs = require("fs/promises");
 const crypto = require("crypto");
 const { requireAuth } = require("../middleware/auth");
 const { requirePostOwner } = require("../middleware/onlyOwner");
+const { classifyCategoryGemini, GEMINI_ENABLED } = require("../scripts/geminiClassifier");
 
 // =========================
 // fetchCompat (node-fetch require 제거: Node18+ global fetch 우선)
@@ -26,11 +27,16 @@ async function fetchCompat(url, options) {
 // =========================
 const KOBERT_URL = process.env.KOBERT_URL; // http://127.0.0.1:7014/classify
 const KOBERT_ENABLED = !!process.env.KOBERT_URL;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
 // 🔍 서버 시작 시 환경 상태 로그
 console.log("[POSTS][INIT_KOBERT]", {
   KOBERT_URL,
   KOBERT_ENABLED,
+});
+console.log("[POSTS][INIT_GEMINI]", {
+  GEMINI_ENABLED,
+  GEMINI_MODEL,
 });
 
 const ALLOWED_CATEGORIES = new Set([
@@ -417,8 +423,18 @@ router.post("/", requireAuth, async (req, res) => {
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-      const predicted = await classifyByKoBERT(text);
-      if (predicted) finalCategory = predicted;
+      // 4-1) Gemini 우선 시도
+      finalCategory = await classifyCategoryGemini(
+        title,
+        postBody,
+        normalizeCategory,
+        ALLOWED_CATEGORIES
+      );
+      // 4-2) 실패 시 KoBERT 시도
+      if (!finalCategory) {
+        const predicted = await classifyByKoBERT(text);
+        if (predicted) finalCategory = predicted;
+      }
     }
 
     if (!finalCategory) {
@@ -434,6 +450,8 @@ router.post("/", requireAuth, async (req, res) => {
       finalCategory,
       KOBERT_ENABLED,
       KOBERT_URL,
+      GEMINI_ENABLED,
+      GEMINI_MODEL,
     });
 
 
@@ -608,8 +626,18 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-      const predicted = await classifyByKoBERT(text);
-      if (predicted) finalCategory = predicted;
+      // 1) Gemini 우선 시도
+      finalCategory = await classifyCategoryGemini(
+        title,
+        postBody,
+        normalizeCategory,
+        ALLOWED_CATEGORIES
+      );
+      // 2) 실패 시 KoBERT 시도
+      if (!finalCategory) {
+        const predicted = await classifyByKoBERT(text);
+        if (predicted) finalCategory = predicted;
+      }
     }
 
     if (!finalCategory) {
