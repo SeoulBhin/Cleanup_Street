@@ -444,6 +444,8 @@ export default function PostView() {
                 key={reply.id}
                 reply={reply}
                 me={me}
+                postId={id}          
+                boardType={boardType} 
                 onActionSuccess={fetchDetail}
               />
             ))

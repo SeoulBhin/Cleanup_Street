@@ -442,6 +442,18 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
   border: none;
 }
 
+.reply-children {
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid #e5e7eb;
+  margin-top: 8px;
+}
+
+.reply-reply-box {
+  margin-top: 8px;
+}
+
+
 .reply-meta{
   display: flex;
   align-items: center;
