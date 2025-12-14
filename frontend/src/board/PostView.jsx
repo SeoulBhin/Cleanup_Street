@@ -447,6 +447,7 @@ export default function PostView() {
                 postId={id}          
                 boardType={boardType} 
                 onActionSuccess={fetchDetail}
+                depth={0}             // ==ADD==         
               />
             ))
           )}
