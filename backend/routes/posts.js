@@ -70,26 +70,7 @@ function classifyByKeywords(title, body) {
   if (has(["도로", "교통", "신호", "차량", "주차", "버스", "횡단보도", "정체"])) {
     return "도로-교통";
   }
-  if (
-    has([
-      "건물",
-      "시설",
-      "시설물",
-      "건축",
-      "벤치",
-      "공원",
-      "파손",
-      "철거",
-      "보수",
-      "나사",
-      "볼트",
-      "헐거",
-      "느슨",
-      "수리",
-      "고정",
-      "고장",
-    ])
-  ) {
+  if (has(["건물", "시설", "시설물", "건축", "벤치", "공원", "파손", "철거", "보수"])) {
     return "시설물-건축";
   }
   if (has(["치안", "범죄", "절도", "도둑", "폭행", "흉기", "경찰", "신고", "위협"])) {
@@ -149,7 +130,6 @@ async function classifyByGemini(text) {
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0, maxOutputTokens: 20 },
-        candidateCount: 1,
       }),
     });
 
