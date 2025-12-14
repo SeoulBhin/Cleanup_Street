@@ -37,18 +37,16 @@ export default function PostView() {
     id !== "new" &&
     !Number.isNaN(Number(id));
 
-  // ✅ ADD: flat 댓글 -> 트리 + 익명번호(user_id 기준) 고정
-  const buildReplyTreeWithAnon = (flatReplies) => {
-    const anonMap = new Map(); // userId -> number
+  // ✅ ADD: 서버가 이미 트리(replies 포함)로 내려주므로 "트리 재구성"은 하지 않고,
+  // 익명 표시(displayAuthor)만 트리 전체에 붙인다.
+  const attachAnonToTree = (roots) => {
+    const anonMap = new Map();
     let seq = 0;
 
-    const nodeMap = new Map(); // replyId -> node
-
-    const normalized = (Array.isArray(flatReplies) ? flatReplies : []).map((x) => {
-      const cid = x.id ?? x.comment_id ?? x.commentId;
-
-      const uidRaw = x.user_id ?? x.userId ?? x.author_id ?? x.authorId;
-      const uid = uidRaw === null || uidRaw === undefined ? NaN : Number(uidRaw);
+    const dfs = (node) => {
+      const uidRaw =
+        node.user_id ?? node.userId ?? node.author_id ?? node.authorId;
+      const uid = uidRaw == null ? NaN : Number(uidRaw);
 
       let displayAuthor = "익명";
       if (Number.isFinite(uid)) {
@@ -56,49 +54,15 @@ export default function PostView() {
         displayAuthor = `익명 ${anonMap.get(uid)}`;
       }
 
-      const parentId =
-        x.parent_id ??
-        x.parentId ??
-        x.parent_comment_id ??
-        x.parentCommentId ??
-        null;
-
-      const node = {
-        ...x,
-        id: cid,
-        parentId,
+      return {
+        ...node,
+        id: node.id ?? node.comment_id ?? node.commentId,
         displayAuthor,
-        replies: [], // 자식 담기
+        replies: Array.isArray(node.replies) ? node.replies.map(dfs) : [],
       };
-
-      nodeMap.set(node.id, node);
-      return node;
-    });
-
-    const roots = [];
-    for (const node of normalized) {
-      const pid = node.parentId;
-      if (pid && nodeMap.has(pid)) {
-        nodeMap.get(pid).replies.push(node);
-      } else {
-        roots.push(node);
-      }
-    }
-
-    // (선택) 시간순 정렬
-    const sortByCreatedAt = (arr) => {
-      arr.sort((a, b) => {
-        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return ta - tb;
-      });
-      for (const n of arr) {
-        if (Array.isArray(n.replies) && n.replies.length > 0) sortByCreatedAt(n.replies);
-      }
     };
-    sortByCreatedAt(roots);
 
-    return roots;
+    return Array.isArray(roots) ? roots.map(dfs) : [];
   };
 
   const fetchDetail = useCallback(async () => {
@@ -119,8 +83,8 @@ export default function PostView() {
 
       const r = await listReplies(boardType, id);
 
-      // ✅ IMPORTANT: flat -> tree + 익명번호 고정
-      const tree = buildReplyTreeWithAnon(r);
+      // ✅ IMPORTANT: 트리는 서버 그대로 사용 + 익명번호만 부여
+      const tree = attachAnonToTree(r);
       setReplies(tree);
 
       try {
@@ -243,7 +207,10 @@ export default function PostView() {
       <div className="page-container fade-in">
         <h2 className="page-title">잘못된 게시글 주소입니다.</h2>
         <div className="form-actions" style={{ marginTop: 24 }}>
-          <Link className="form-btn btn-cancel" to={`/board/${boardType || "free"}`}>
+          <Link
+            className="form-btn btn-cancel"
+            to={`/board/${boardType || "free"}`}
+          >
             목록으로 돌아가기
           </Link>
         </div>
@@ -272,7 +239,9 @@ export default function PostView() {
   if (!post) return <div className="page-container">게시글 정보가 없습니다.</div>;
 
   const myId = me ? Number(me.id ?? me.user_id ?? me.userId) : null;
-  const ownerId = Number(post.user_id ?? post.author_id ?? post.userId ?? post.userId);
+  const ownerId = Number(
+    post.user_id ?? post.author_id ?? post.userId ?? post.userId
+  );
   const isOwner = myId !== null && ownerId === myId;
 
   const images = Array.isArray(post.images) ? post.images : [];
@@ -345,16 +314,24 @@ export default function PostView() {
         </span>
         <span>작성자: {post.author || "익명"}</span> |{" "}
         <span>
-          작성일: {post.created_at ? new Date(post.created_at).toLocaleString() : "-"}
+          작성일:{" "}
+          {post.created_at ? new Date(post.created_at).toLocaleString() : "-"}
         </span>
       </div>
 
       <div className="post-actions-detail" style={{ marginBottom: 12 }}>
-        <button className={`btn-action ${isLiked ? "active" : ""}`} onClick={handleLike}>
+        <button
+          className={`btn-action ${isLiked ? "active" : ""}`}
+          onClick={handleLike}
+        >
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
 
-        <button className="btn-action btn-report" onClick={handleReportPost} style={{ marginLeft: 8 }}>
+        <button
+          className="btn-action btn-report"
+          onClick={handleReportPost}
+          style={{ marginLeft: 8 }}
+        >
           🚨 신고
         </button>
       </div>
@@ -370,7 +347,9 @@ export default function PostView() {
 
       {/* 이미지 영역(원본 유지) */}
       <div style={{ marginTop: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+        >
           <strong>이미지</strong>
           {!hasProcessed && !!attachments.length && (
             <span
@@ -417,11 +396,15 @@ export default function PostView() {
               />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
-              {activeImage.createdAt ? new Date(activeImage.createdAt).toLocaleString() : ""}
+              {activeImage.createdAt
+                ? new Date(activeImage.createdAt).toLocaleString()
+                : ""}
             </div>
           </div>
         ) : (
-          <div style={{ marginTop: 12, color: "#94a3b8" }}>표시할 이미지가 없습니다.</div>
+          <div style={{ marginTop: 12, color: "#94a3b8" }}>
+            표시할 이미지가 없습니다.
+          </div>
         )}
       </div>
 
@@ -469,7 +452,10 @@ export default function PostView() {
 
         {isOwner && (
           <>
-            <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
+            <Link
+              className="form-btn btn-submit"
+              to={`/board/${boardType}/${id}/edit`}
+            >
               수정
             </Link>
 
