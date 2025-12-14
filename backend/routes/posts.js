@@ -1,4 +1,4 @@
-// backend/routes/posts.js
+// backend/routes/posts.js (MERGED 1/2)
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // pg 래퍼 (db.query)
@@ -22,17 +22,8 @@ async function fetchCompat(url, options) {
 }
 
 // =========================
-// KoBERT 호출 (자동 분류)
+// 공통: 카테고리 정규화/허용 목록
 // =========================
-const KOBERT_URL = process.env.KOBERT_URL; // http://127.0.0.1:7014/classify
-const KOBERT_ENABLED = !!process.env.KOBERT_URL;
-
-// 🔍 서버 시작 시 환경 상태 로그
-console.log("[POSTS][INIT_KOBERT]", {
-  KOBERT_URL,
-  KOBERT_ENABLED,
-});
-
 const ALLOWED_CATEGORIES = new Set([
   "도로-교통",
   "시설물-건축",
@@ -48,40 +39,114 @@ function normalizeCategory(raw) {
 
   let s = raw.trim();
 
-  // 1) 공백/구분자 통일
-  s = s.replace(/\s+/g, "");      // 모든 공백 제거
-  s = s.replace(/[·ㆍ]/g, "-");   // 가운데점 → 하이픈
-  s = s.replace(/_/g, "-");       // 언더스코어 → 하이픈
+  // 공백/구분자 통일
+  s = s.replace(/\s+/g, "");
+  s = s.replace(/[·ㆍ]/g, "-");
+  s = s.replace(/_/g, "-");
 
-  // 2) 자주 나올 수 있는 변형들을 보정
-  // 도로-교통
+  // 자주 나오는 변형 보정
   if (s === "도로교통") s = "도로-교통";
-
-  // 시설물-건축
   if (s === "시설물건축") s = "시설물-건축";
-
-  // 치안-범죄위험
-  if (s === "치안" || s === "치안범죄위험" || s === "치안-범죄") {
-    s = "치안-범죄위험";
-  }
-
-  // 자연재난-환경
-  if (
-    s === "자연재난환경" ||
-    s === "자연재난" ||
-    s === "자연환경" ||
-    s === "자연-재난환경"
-  ) {
+  if (s === "치안" || s === "치안범죄위험" || s === "치안-범죄") s = "치안-범죄위험";
+  if (s === "자연재난환경" || s === "자연재난" || s === "자연환경" || s === "자연-재난환경") {
     s = "자연재난-환경";
   }
-
-  // 위생-보건
   if (s === "위생보건") s = "위생-보건";
 
-  // 나머지는 그대로 반환
   return s;
 }
 
+function pickFirstLine(raw) {
+  return String(raw || "").split(/\r?\n/)[0].trim();
+}
+
+// =========================
+// Gemini 호출 (자동 분류) - REST
+// =========================
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_ENABLED = !!GEMINI_API_KEY;
+
+console.log("[POSTS][INIT_GEMINI]", {
+  enabled: GEMINI_ENABLED,
+  model: GEMINI_MODEL,
+});
+
+async function classifyByGemini(text) {
+  if (!GEMINI_ENABLED) {
+    console.warn("[GEMINI] disabled: no GEMINI_API_KEY env");
+    return null;
+  }
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 10000);
+
+  try {
+    const prompt =
+      "당신은 한국어 민원/제보 글을 7개 카테고리 중 하나로만 분류하는 분류기입니다.\n" +
+      "반드시 다음 라벨 중 하나만 정확히 한 줄로 출력하세요(설명/기호/따옴표/JSON 금지):\n" +
+      "도로-교통\n시설물-건축\n치안-범죄위험\n자연재난-환경\n위생-보건\n기타\n스팸\n\n" +
+      "[입력]\n" + String(text || "");
+
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        GEMINI_MODEL
+      )}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+
+    const res = await fetchCompat(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: ac.signal,
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 20,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "");
+      console.warn("[GEMINI] bad status:", res.status, bodyText.slice(0, 300));
+      return null;
+    }
+
+    const data = await res.json();
+
+    const raw =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+      data?.candidates?.[0]?.content?.parts
+        ?.map((p) => p?.text)
+        .filter(Boolean)
+        .join("\n") ??
+      "";
+
+    const picked = pickFirstLine(raw);
+    const norm = normalizeCategory(picked);
+
+    console.log("[GEMINI] response <-", { raw: picked, norm });
+
+    if (!norm) return null;
+    return ALLOWED_CATEGORIES.has(norm) ? norm : null;
+  } catch (e) {
+    console.warn("[GEMINI] classify failed:", e?.message || e);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// =========================
+// KoBERT 호출 (자동 분류)
+// =========================
+const KOBERT_URL = process.env.KOBERT_URL; // 예: http://127.0.0.1:7014/classify
+const KOBERT_ENABLED = !!process.env.KOBERT_URL;
+
+console.log("[POSTS][INIT_KOBERT]", {
+  KOBERT_URL,
+  KOBERT_ENABLED,
+});
 
 async function classifyByKoBERT(text) {
   if (!KOBERT_ENABLED) {
@@ -95,7 +160,7 @@ async function classifyByKoBERT(text) {
   try {
     console.log("[KoBERT] request ->", {
       url: KOBERT_URL,
-      textPreview: String(text).slice(0, 50), // 앞 50자만
+      textPreview: String(text).slice(0, 50),
     });
 
     const res = await fetchCompat(KOBERT_URL, {
@@ -108,7 +173,7 @@ async function classifyByKoBERT(text) {
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
       console.warn("[KoBERT] bad status:", res.status, bodyText);
-      throw new Error(`KoBERT ${res.status}`);
+      return null;
     }
 
     const data = await res.json();
@@ -122,13 +187,9 @@ async function classifyByKoBERT(text) {
 
     const norm = normalizeCategory(picked);
 
-    console.log("[KoBERT] response <-", {
-      raw: picked,
-      norm,
-    });
+    console.log("[KoBERT] response <-", { raw: picked, norm });
 
     if (!norm) return null;
-
     return ALLOWED_CATEGORIES.has(norm) ? norm : null;
   } catch (e) {
     console.warn("[KoBERT] classify failed:", e?.message || e);
@@ -138,6 +199,20 @@ async function classifyByKoBERT(text) {
   }
 }
 
+// =========================
+// 자동 분류 선택 로직: Gemini 우선 → KoBERT 폴백
+// =========================
+async function classifyAuto(text) {
+  // 1) Gemini
+  const g = await classifyByGemini(text);
+  if (g) return g;
+
+  // 2) KoBERT
+  const k = await classifyByKoBERT(text);
+  if (k) return k;
+
+  return null;
+}
 
 // =========================
 // uploads helpers
@@ -153,7 +228,6 @@ function resolveUploadPath(url) {
   return path.join(UPLOAD_DIR, filename);
 }
 
-// 선택된 이미지 URL을 현재 업로드 디렉터리에 복사/저장 후 새 공개 URL 반환
 async function persistImageToUploads(selectedImageUrl, req, variant = "AUTO") {
   if (!selectedImageUrl) return null;
   try {
@@ -192,7 +266,7 @@ async function persistImageToUploads(selectedImageUrl, req, variant = "AUTO") {
     return `${base}/uploads/${filename}`;
   } catch (err) {
     console.warn("[persistImageToUploads] failed", err.message || err);
-    return selectedImageUrl; // 실패 시 기존 URL 그대로 사용
+    return selectedImageUrl;
   }
 }
 
@@ -245,7 +319,6 @@ const BASE_SELECT = `
   FROM posts p
 `;
 
-// 단일 게시글 조회 함수
 async function fetchPostById(postId) {
   const query = `${BASE_SELECT} WHERE p.post_id = $1`;
   const { rows } = await db.query(query, [postId]);
@@ -257,18 +330,17 @@ function normalizeAddress(address) {
   return a ? a : null;
 }
 
-// h3-js hex string -> bigint(10진수 문자열)로 변환 시도 (DB가 bigint여도 안전)
 function h3HexToDecimalString(hexIndex) {
   if (!hexIndex || typeof hexIndex !== "string") return null;
   const s = hexIndex.trim();
   try {
-    // "8a..." 같은 hex가 들어오면 0x 붙여서 BigInt로
     const bi = BigInt("0x" + s.replace(/^0x/i, ""));
     return bi.toString(10);
   } catch {
     return null;
   }
 }
+
 async function geocodeNaver(address) {
   if (!address || !address.trim()) return null;
 
@@ -341,9 +413,8 @@ router.get("/:postId", async (req, res) => {
   }
 });
 
-// ================== 새 글 작성 (주소 + 지도/H3 + KoBERT 포함) ==================
+// ================== 새 글 작성 (주소 + 지도/H3 + 자동 분류) ==================
 router.post("/", requireAuth, async (req, res) => {
-  // userId는 토큰에서만 결정
   const userId = Number(req.user?.id ?? req.user?.user_id);
   if (!Number.isFinite(userId)) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -366,16 +437,13 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   try {
-    // 1) 주소/좌표 정리
+    // 1) 주소/좌표
     let lat = latitude;
     let lng = longitude;
     let h3Idx = h3Index;
     const addr = normalizeAddress(address);
 
-    if (
-      (lat == null || lng == null || lat === "" || lng === "") &&
-      addr
-    ) {
+    if ((lat == null || lng == null || lat === "" || lng === "") && addr) {
       const geo = await geocodeNaver(addr);
       if (geo) {
         lat = geo.lat;
@@ -387,14 +455,11 @@ router.post("/", requireAuth, async (req, res) => {
 
     lat = lat != null && lat !== "" ? Number(lat) : null;
     lng = lng != null && lng !== "" ? Number(lng) : null;
-
     const hasCoord = Number.isFinite(lat) && Number.isFinite(lng);
 
-    // 2) H3 계산 (DB bigint 대비: 10진 문자열로 변환 시도)
+    // 2) H3
     let h3ToStore = null;
-
     if (h3Idx != null && h3Idx !== "") {
-      // 들어온 h3Index가 hex면 bigint(10진)로 변환, 아니면 원문 사용
       if (typeof h3Idx === "string") {
         const dec = h3HexToDecimalString(h3Idx);
         h3ToStore = dec ?? h3Idx;
@@ -410,32 +475,31 @@ router.post("/", requireAuth, async (req, res) => {
     // 3) location
     const location = hasCoord ? `SRID=4326;POINT(${lng} ${lat})` : null;
 
-    // 4) KoBERT 분류 (autoCategory=true일 때만 시도)
+    // 4) 자동 분류
     const wantAuto = !!autoCategory;
     const requested = normalizeCategory(category);
     let finalCategory = null;
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-      const predicted = await classifyByKoBERT(text);
+      const predicted = await classifyAuto(text);
       if (predicted) finalCategory = predicted;
     }
 
     if (!finalCategory) {
-      // 자동 분류 실패/비활성 시: 요청값이 허용 카테고리면 사용, 아니면 기타
       finalCategory =
         requested && ALLOWED_CATEGORIES.has(requested) ? requested : "기타";
     }
-        // 🔍 자동 분류 디버그용 로그
+
     console.log("[POSTS][AUTO_CATEGORY_DEBUG]", {
-      title,
       wantAuto,
       requested,
       finalCategory,
+      GEMINI_ENABLED,
+      GEMINI_MODEL,
       KOBERT_ENABLED,
       KOBERT_URL,
     });
-
 
     // 5) preview 조회
     let previewData = null;
@@ -450,7 +514,7 @@ router.post("/", requireAuth, async (req, res) => {
       previewData = previewResult.rows[0];
     }
 
-    // 6) INSERT (address 포함)
+    // 6) INSERT
     const insertQuery = `
       INSERT INTO posts (
         user_id, title, content, category,
@@ -461,7 +525,6 @@ router.post("/", requireAuth, async (req, res) => {
       RETURNING post_id;
     `;
 
-    const status = "DONE";
     const insertValues = [
       userId,
       title,
@@ -470,7 +533,7 @@ router.post("/", requireAuth, async (req, res) => {
       addr,
       location,
       h3ToStore,
-      status,
+      "DONE",
       lat,
       lng,
     ];
@@ -478,7 +541,7 @@ router.post("/", requireAuth, async (req, res) => {
     const { rows } = await db.query(insertQuery, insertValues);
     const newPostId = rows[0].post_id;
 
-    // 7) preview 이미지 처리(기존 로직 유지)
+    // 7) preview 이미지 처리
     if (previewData) {
       const selectedVariant =
         req.body.selectedVariant === "PLATE_VISIBLE" ? "PLATE_VISIBLE" : "AUTO";
@@ -493,6 +556,7 @@ router.post("/", requireAuth, async (req, res) => {
         selectedVariant
       );
 
+
       await db.query(
         `INSERT INTO post_images (post_id, image_url, variant) VALUES ($1,$2,$3);`,
         [newPostId, selectedImage, selectedVariant]
@@ -504,15 +568,15 @@ router.post("/", requireAuth, async (req, res) => {
       );
 
       const deleteTargets = [];
-      const originalUrl = previewData.original_image_url;
-
       if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
         deleteTargets.push(previewData.plate_visible_image);
       }
       if (selectedVariant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
         deleteTargets.push(previewData.auto_mosaic_image);
       }
-      if (originalUrl) deleteTargets.push(originalUrl);
+      if (previewData.original_image_url) {
+        deleteTargets.push(previewData.original_image_url);
+      }
 
       await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
       await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
@@ -527,6 +591,7 @@ router.post("/", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to create post" });
   }
 });
+
 // ================== 글 수정 (작성자만) ==================
 router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
   const { postId } = req.params;
@@ -540,7 +605,7 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     h3Index,
     previewId,
     address,
-    autoCategory, // 수정 화면에서는 보통 false가 옴
+    autoCategory,
   } = req.body;
 
   if (!title || !postBody) {
@@ -551,14 +616,15 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     const existing = await fetchPostById(postId);
     if (!existing) return res.status(404).json({ error: "Post not found" });
 
+    // ✅ 작성자(토큰) 재검증: 라우트에서 한 번만
     const me = Number(req.user?.id ?? req.user?.user_id);
     if (!Number.isFinite(me)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-
     if (Number(existing.user_id) !== me) {
       return res.status(403).json({ error: "FORBIDDEN", code: "NOT_AUTHOR" });
     }
+
 
     // 주소/좌표
     let lat = latitude;
@@ -566,10 +632,7 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     let h3Idx = h3Index;
     const addr = normalizeAddress(address);
 
-    if (
-      (lat == null || lng == null || lat === "" || lng === "") &&
-      addr
-    ) {
+    if ((lat == null || lng == null || lat === "" || lng === "") && addr) {
       const geo = await geocodeNaver(addr);
       if (geo) {
         lat = geo.lat;
@@ -581,7 +644,6 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
 
     lat = lat != null && lat !== "" ? Number(lat) : null;
     lng = lng != null && lng !== "" ? Number(lng) : null;
-
     const hasCoord = Number.isFinite(lat) && Number.isFinite(lng);
 
     // H3
@@ -608,18 +670,16 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
 
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
-      const predicted = await classifyByKoBERT(text);
+      const predicted = await classifyAuto(text);
       if (predicted) finalCategory = predicted;
     }
 
     if (!finalCategory) {
-      // 수정은 기본적으로 기존 값을 유지하고 싶어하는 흐름이므로,
-      // 요청값이 허용이면 요청값, 아니면 기존값, 그것도 없으면 기타
       if (requested && ALLOWED_CATEGORIES.has(requested)) finalCategory = requested;
       else finalCategory = existing.category || "기타";
     }
 
-    // UPDATE (address 포함)
+    // UPDATE
     const updateQuery = `
       UPDATE posts
       SET
@@ -651,7 +711,7 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     const { rows } = await db.query(updateQuery, updateValues);
     if (!rows.length) return res.status(404).json({ error: "Post not found" });
 
-    // previewId 처리 (기존 로직 유지)
+    // preview 처리 (새 이미지로 교체할 때만 기존 정리)
     if (previewId) {
       const previewResult = await db.query(
         "SELECT original_image_url, auto_mosaic_image, plate_visible_image FROM image_previews WHERE preview_id = $1",
@@ -661,9 +721,7 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
       if (previewResult.rows.length) {
         const previewData = previewResult.rows[0];
         const selectedVariant =
-          req.body.selectedVariant === "PLATE_VISIBLE"
-            ? "PLATE_VISIBLE"
-            : "AUTO";
+          req.body.selectedVariant === "PLATE_VISIBLE" ? "PLATE_VISIBLE" : "AUTO";
 
         const selectedImageRaw =
           selectedVariant === "PLATE_VISIBLE"
@@ -676,33 +734,45 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
           selectedVariant
         );
 
+        // ✅ (추가) 교체 전 기존 post_images URL 확보
+        const { rows: oldImgRows } = await db.query(
+          "SELECT image_url FROM post_images WHERE post_id = $1",
+          [postId]
+        );
+        const oldImageUrls = oldImgRows.map((r) => r.image_url).filter(Boolean);
+
+        // ✅ 기존 post_images 행 삭제
+        await db.query("DELETE FROM post_images WHERE post_id = $1", [postId]);
+
+        // ✅ 새 이미지 INSERT
         await db.query(
           `INSERT INTO post_images (post_id, image_url, variant) VALUES ($1,$2,$3);`,
           [postId, selectedImage, selectedVariant]
         );
 
-        await db.query(
-          "UPDATE image_previews SET is_used = true WHERE preview_id = $1",
-          [previewId]
-        );
+        // ✅ (추가) 교체 전 기존 업로드 파일 삭제
+        const urlsToDelete = oldImageUrls.filter((u) => u && u !== selectedImage);
+        await Promise.all(urlsToDelete.map((u) => deleteLocalUpload(u)));
 
+
+        // ✅ preview 임시 이미지 삭제 + preview 레코드 삭제
         const deleteTargets = [];
-        const originalUrl = previewData.original_image_url;
-
         if (selectedVariant === "AUTO" && previewData.plate_visible_image) {
           deleteTargets.push(previewData.plate_visible_image);
         }
         if (selectedVariant === "PLATE_VISIBLE" && previewData.auto_mosaic_image) {
           deleteTargets.push(previewData.auto_mosaic_image);
         }
-        if (originalUrl) deleteTargets.push(originalUrl);
+        if (previewData.original_image_url) {
+          deleteTargets.push(previewData.original_image_url);
+        }
 
         await Promise.all(deleteTargets.map((u) => deleteLocalUpload(u)));
-        await db.query("DELETE FROM image_previews WHERE preview_id = $1", [
-          previewId,
-        ]);
+        await db.query("DELETE FROM image_previews WHERE preview_id = $1", [previewId]);
       }
     }
+
+
 
     const updatedPost = await fetchPostById(postId);
     res.json(updatedPost);
@@ -724,19 +794,32 @@ router.delete("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     if (!Number.isFinite(me)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-
     if (Number(existing.user_id) !== me) {
       return res.status(403).json({ error: "FORBIDDEN", code: "NOT_AUTHOR" });
     }
 
+    // ✅ DB 삭제 전에 image_url 확보
+    const { rows: imgRows } = await db.query(
+      "SELECT image_url FROM post_images WHERE post_id = $1",
+      [postId]
+    );
+    const imageUrls = imgRows.map((r) => r.image_url).filter(Boolean);
+
+    // ✅ DB 삭제
     await db.query("DELETE FROM post_images WHERE post_id = $1", [postId]);
     await db.query("DELETE FROM posts WHERE post_id = $1", [postId]);
 
+    // ✅ 실제 파일 삭제
+    await Promise.all(imageUrls.map((u) => deleteLocalUpload(u)));
+
     return res.status(204).send();
+
+    
   } catch (err) {
     console.error("Failed to delete post", err);
     return res.status(500).json({ error: "Failed to delete post" });
   }
 });
+
 
 module.exports = router;
