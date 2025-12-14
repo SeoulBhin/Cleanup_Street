@@ -412,11 +412,10 @@ router.post("/", requireAuth, async (req, res) => {
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
       const g = await classifyByGemini(text);
-      const kw = g ? null : classifyByKeywords(title, postBody);
 
-      finalCategory = g || kw || null;
+      finalCategory = g || null;
 
-      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, kw });
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g });
     }
 
     if (!finalCategory) {
@@ -602,11 +601,10 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
       const g = await classifyByGemini(text);
-      const kw = g ? null : classifyByKeywords(title, postBody);
 
-      finalCategory = g || kw || null;
+      finalCategory = g || null;
 
-      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, kw });
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g });
     }
 
     if (!finalCategory) {
