@@ -442,11 +442,92 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
   border: none;
 }
 
-.reply-children {
-  margin-left: 24px;
-  padding-left: 12px;
-  border-left: 2px solid #e5e7eb;
+/* =======================
+   Naver-like Reply UI
+   ======================= */
+
+.reply-row {
+  display: flex;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid #e5e7eb;   /* ✅ 댓글마다 구분선 */
+}
+
+.reply-row:first-child {
+  border-top: none; /* 첫 댓글은 선 제거 */
+}
+
+.reply-branch {
+  width: 18px;
+  color: #9ca3af;
+  font-weight: 700;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.reply-body {
+  flex: 1;
+}
+
+.reply-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;              /* ✅ 익명 / 날짜 간격 */
+  margin-bottom: 6px;
+}
+
+.reply-author {
+  font-weight: 700;
+  color: #111827;
+}
+
+.reply-date {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.reply-content {
+  white-space: pre-wrap;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.reply-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.btn-reply-action {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.btn-reply-action:hover {
+  background: #f9fafb;
+}
+
+.reply-reply-box,
+.reply-edit-box {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f9fafb;         
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.reply-edit-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 8px;
+}
+
+.reply-children {
+  margin-top: 6px;
 }
 
 .reply-reply-box {
