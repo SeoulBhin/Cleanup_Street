@@ -16,7 +16,7 @@ export function getBoardPost(boardType, id) {
 export function createBoardPost(boardType, body) {
   const { userId, user_id, content, postBody, ...rest } = body || {};
 
-  const finalCategory = (rest.category ?? boardType ?? "기타");
+  const finalCategory = rest.category ?? boardType ?? "기타";
   const finalPostBody = (content ?? postBody ?? "").toString();
 
   return postJSON(`/api/posts`, {
@@ -30,7 +30,7 @@ export function createBoardPost(boardType, body) {
 export function updateBoardPost(boardType, id, body) {
   const { userId, user_id, content, postBody, ...rest } = body || {};
 
-  const finalCategory = (rest.category ?? boardType ?? "기타");
+  const finalCategory = rest.category ?? boardType ?? "기타";
   const finalPostBody = (content ?? postBody ?? "").toString();
 
   return putJSON(`/api/posts/${id}`, {
@@ -50,6 +50,14 @@ export function deleteBoardPost(boardType, id) {
 ========================= */
 export function addLike(boardType, postId) {
   return postJSON(`/api/posts/${postId}/like`);
+}
+
+/* =========================
+   ✅ 게시글 신고
+   POST /api/report/posts/:id (requireAuth)
+========================= */
+export function reportPost(boardType, postId, reason) {
+  return postJSON(`/api/report/posts/${postId}`, { reason });
 }
 
 /* =========================
@@ -78,7 +86,7 @@ export function addReplyLike(replyId) {
 ========================= */
 export function reportReply(replyId, reason) {
   return postJSON(`/api/report/comment/${replyId}`, {
-    reason, // ✅ 서버가 기대하는 필드명
+    reason,
   });
 }
 
@@ -92,6 +100,10 @@ export function deleteReply(replyId) {
   return del(`/api/comments/${replyId}`);
 }
 
+/* =========================
+   ✅ (추가) 게시글 좋아요 상태/개수 조회
+   GET /api/posts/:postId/like-state (requireAuth)
+========================= */
 export function getPostLikeState(postId) {
   return getJSON(`/api/posts/${postId}/like-state`);
 }
