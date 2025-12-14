@@ -318,12 +318,12 @@ app.get("/api/announcements", (req, res) => {
 
 app.get("/api/gallery", (req, res) => {
   res.json([
-    { id: 1, url: "/gallery/1.png", caption: "고장난 가로등 신고 후 수리", roomId: "gallery-1" },
-    { id: 2, url: "/gallery/2.png", caption: "도로 파손 정비 전/후",       roomId: "gallery-2" },
-    { id: 3, url: "/gallery/3.png", caption: "공원 쓰레기 정리 캠페인",     roomId: "gallery-3" },
-    { id: 4, url: "/gallery/4.png", caption: "불법 투기 단속 현장",         roomId: "gallery-4" },
-    { id: 5, url: "/gallery/5.png", caption: "커뮤니티 합동 정화 활동",     roomId: "gallery-5" },
-    { id: 6, url: "/gallery/6.png", caption: "깨끗해진 벤치 주변",           roomId: "gallery-6" },
+    { id: 1, url: "/gallery/1.png", caption: "고장난 가로등 신고 후 수리", roomId: "Broken Streetlight" },
+    { id: 2, url: "/gallery/2.png", caption: "도로 파손 정비 전/후",       roomId: "Pothole Report" },
+    { id: 3, url: "/gallery/3.png", caption: "공원 쓰레기 정리 캠페인",     roomId: "Cleand Park" },
+    { id: 4, url: "/gallery/4.png", caption: "불법 투기 단속 현장",         roomId: "Illegal Dumping" },
+    { id: 5, url: "/gallery/5.png", caption: "커뮤니티 합동 정화 활동",     roomId: "Community Effort" },
+    { id: 6, url: "/gallery/6.png", caption: "깨끗해진 벤치 주변",           roomId: "Repaired Bench" },
   ]);
 });
 
