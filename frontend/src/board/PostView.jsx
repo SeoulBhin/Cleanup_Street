@@ -11,6 +11,11 @@ import {
 
 import ReplyItem from "./ReplyItem";
 
+// == ADD ==
+import { getMe } from "../api/auth";
+// == ADD END ==
+
+
 export default function PostView() {
   const { boardType, id } = useParams();
   const navigate = useNavigate();
@@ -27,6 +32,10 @@ export default function PostView() {
   const [isLiked, setIsLiked] = useState(false);
   const [replies, setReplies] = useState([]);
   const [newReplyText, setNewReplyText] = useState("");
+
+  // == ADD ==
+  const [me, setMe] = useState(null);
+  // == ADD END ==
 
   // 🔹 id가 정상적인 숫자인지 체크
   const isValidId =
@@ -79,6 +88,17 @@ export default function PostView() {
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
+
+  // == ADD: 내 정보 불러오기 ==
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    getMe()
+      .then((r) => setMe(r?.me))
+      .catch(() => setMe(null));
+  }, []);
+  // == ADD END ==
 
   // --------------------------
   // ✅ 게시글 좋아요 토글
@@ -194,6 +214,12 @@ export default function PostView() {
   if (!post) {
     return <div className="page-container">게시글 정보가 없습니다.</div>;
   }
+
+  // == ADD: 작성자 판별 ==
+  const myId = me ? Number(me.id ?? me.user_id ?? me.userId) : null;
+  const ownerId = Number(post.user_id ?? post.author_id ?? post.userId ?? post.userId);
+  const isOwner = myId !== null && ownerId === myId;
+  // == ADD END ==
 
   // --------------------------
   // ✅ 이미지 처리 로직 그대로
@@ -428,19 +454,20 @@ export default function PostView() {
           목록
         </Link>
 
-        {/* ✅ 로그인 전에는 수정/삭제 버튼 숨김 */}
-         {false && isLoggedIn && (
-    <>
-      <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
-        수정
-      </Link>
+        {/* == CHANGE: 작성자만 수정/삭제 보이게 == */}
+        {isOwner && (
+          <>
+            <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
+              수정
+            </Link>
 
-      <button className="form-btn btn-submit" onClick={onDelete}>
-        삭제
-      </button>
-    </>
-  )}
-</div>
+            <button className="form-btn btn-submit" onClick={onDelete}>
+              삭제
+            </button>
+          </>
+        )}
+        {/* == CHANGE END == */}
+      </div>
     </div>
   );
 }

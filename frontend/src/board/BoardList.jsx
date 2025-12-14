@@ -171,24 +171,6 @@ export default function BoardList() {
                   </div>
 
                   <div className="post-actions">
-                    {/* == CHANGE: 작성자만 수정/삭제 노출 == */}
-                    {isOwner && (
-                      <>
-                        <Link
-                          to={`/board/${boardType}/${p.id}/edit`}
-                          className="btn-edit"
-                        >
-                          수정
-                        </Link>
-                        <button
-                          className="btn-delete"
-                          onClick={() => onDelete(p.id)}
-                        >
-                          삭제
-                        </button>
-                      </>
-                    )}
-                    {/* == CHANGE END == */}
                   </div>
                 </div>
               </div>
