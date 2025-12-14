@@ -429,18 +429,18 @@ export default function PostView() {
         </Link>
 
         {/* ✅ 로그인 전에는 수정/삭제 버튼 숨김 */}
-        {isLoggedIn && (
-          <>
-            <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
-              수정
-            </Link>
+         {false && isLoggedIn && (
+    <>
+      <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
+        수정
+      </Link>
 
-            <button className="form-btn btn-submit" onClick={onDelete}>
-              삭제
-            </button>
-          </>
-        )}
-      </div>
+      <button className="form-btn btn-submit" onClick={onDelete}>
+        삭제
+      </button>
+    </>
+  )}
+</div>
     </div>
   );
 }
