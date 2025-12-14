@@ -64,8 +64,11 @@ function pickFirstLine(raw) {
 // 키워드 백업 분류 (Gemini 실패 시 대비)
 // =========================
 function classifyByKeywords(title, body) {
-  const text = `${String(title || "")} ${String(body || "")}`;
-  const has = (arr) => arr.some((k) => text.includes(k));
+  const text = `${String(title || "")} ${String(body || "")}`
+    .toLowerCase()
+    .replace(/\s+/g, "");
+  const has = (arr) =>
+    arr.some((k) => text.includes(k.toLowerCase().replace(/\s+/g, "")));
 
   if (has(["도로", "교통", "신호", "차량", "주차", "버스", "횡단보도", "정체"])) {
     return "도로-교통";
@@ -129,11 +132,14 @@ async function classifyByGemini(text) {
   const timer = setTimeout(() => ac.abort(), 10000);
 
   try {
-    const prompt =
-      "당신은 한국어 민원/제보 글을 7개 카테고리 중 하나로만 분류하는 분류기입니다.\n" +
-      "반드시 다음 라벨 중 하나만 정확히 한 줄로 출력하세요(설명/기호/따옴표/JSON 금지):\n" +
-      "도로-교통\n시설물-건축\n치안-범죄위험\n자연재난-환경\n위생-보건\n기타\n스팸\n\n" +
-      "[입력]\n" + String(text || "");
+    const prompt = `
+당신은 한국어 민원/제보 글을 7개 카테고리 중 하나로 분류하는 모델입니다.
+아래 라벨 중 하나만, 한 줄로 그대로 출력하세요. 추가 설명/기호/따옴표/JSON 금지.
+라벨: 도로-교통, 시설물-건축, 치안-범죄위험, 자연재난-환경, 위생-보건, 기타, 스팸
+
+[입력]
+${String(text || "")}
+    `.trim();
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
   GEMINI_MODEL
@@ -170,6 +176,7 @@ async function classifyByGemini(text) {
       "";
 
     const picked = pickFirstLine(raw);
+    if (!picked.trim()) return null;
     const norm = normalizeCategory(picked);
 
     console.log("[GEMINI] response <-", { raw: picked, norm });
