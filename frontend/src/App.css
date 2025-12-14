@@ -750,7 +750,7 @@ body {
 }
 /* 모달 컨텐츠 박스 */
 .modal-content {
-    background-color: #ffffff;
+    background-color: white;
     padding: 30px;
     border-radius: 12px;
     width: 100%;
@@ -1028,9 +1028,9 @@ body {
     background-color: #ef4444;
     color: white;
     border-radius: 50%;
-    width: 20px; /* 크기 조정 */
-    height: 20px; /* 크기 조정 */
-    font-size: 0.8rem; /* 크기 조정 */
+    width: 20px;
+    height: 20px;
+    font-size: 0.8rem;
     font-weight: 700;
     line-height: 1;
     transform: translate(50%, -50%);
