@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # 설정 / 환경변수
 # -----------------------------
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = "AIzaSyAUBeBBsvmhadJ00jq6kOREleCqavdAAlI"
 if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY 환경 변수가 설정되어 있지 않습니다.")
 
