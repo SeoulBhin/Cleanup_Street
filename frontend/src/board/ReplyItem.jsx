@@ -1,20 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { addReplyLike, reportReply, updateReply, deleteReply, submitReply } from "../api/boards"; 
-// ==ADD: submitReply를 쓰는 구조면 boards api에 맞게 import 필요==
-// submitReply가 "게시글 댓글 등록"만 있으면, 대댓글도 같은 API에 parent_id로 보내면 됨
+import { addReplyLike, reportReply, updateReply, deleteReply, submitReply } from "../api/boards";
 
 export default function ReplyItem({
   reply,
   onActionSuccess,
   me,
-  depth = 0,                 // ==ADD==
-  boardType,                 // ==ADD==
-  postId,                    // ==ADD==
+  depth = 0,
+  boardType,
+  postId,
+  isLast = false, // ✅ 마지막 자식 여부
 }) {
-  const replyId = useMemo(
-    () => reply.id ?? reply.comment_id ?? reply.commentId,
-    [reply]
-  );
+  const replyId = useMemo(() => reply.id ?? reply.comment_id ?? reply.commentId, [reply]);
 
   const [isLiked, setIsLiked] = useState(reply.is_liked_by_me || false);
   const [likesCount, setLikesCount] = useState(reply.likes || 0);
@@ -22,15 +18,12 @@ export default function ReplyItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(reply.content || "");
 
-  // ==ADD: 대댓글 입력 모드==
   const [isReplying, setIsReplying] = useState(false);
   const [replyText, setReplyText] = useState("");
 
-  // 내 댓글만 수정/삭제 가능
   const myId = Number(me?.id ?? me?.user_id ?? me?.userId);
   const authorId = Number(reply?.user_id ?? reply?.author_id ?? reply?.userId);
-  const canEdit =
-    Number.isFinite(myId) && Number.isFinite(authorId) && myId === authorId;
+  const canEdit = Number.isFinite(myId) && Number.isFinite(authorId) && myId === authorId;
 
   const handleReplyLike = async () => {
     if (!replyId) return alert("댓글 ID 오류");
@@ -107,16 +100,12 @@ export default function ReplyItem({
     }
   };
 
-  // ==ADD: 대댓글 등록==
   const submitChildReply = async () => {
     if (!replyId) return alert("부모 댓글 ID 오류");
     if (!replyText.trim()) return alert("답글 내용을 입력하세요.");
 
     try {
-      // ✅ 여기 중요:
-      // 네 백엔드 addComment가 { content, parent_id } 받으니까
-      // submitReply(boardType, postId, text, parent_id) 형태로 API를 맞춰야 함.
-      await submitReply(boardType, postId, replyText.trim(), replyId); // ==ADD==
+      await submitReply(boardType, postId, replyText.trim(), replyId);
       setReplyText("");
       setIsReplying(false);
       onActionSuccess?.();
@@ -127,21 +116,17 @@ export default function ReplyItem({
     }
   };
 
-  // ==ADD: 들여쓰기 + ㄴ 표시==
-  const indentPx = depth * 22;
+  const isChild = depth > 0;
 
   return (
-    <div
-      className="reply-row" // ==ADD: 댓글마다 경계선==
-      style={{ paddingLeft: indentPx }}
-    >
-      <div className="reply-item">
-        {/* ==ADD: ㄴ/└ 표시 (대댓글일 때만)== */}
-        {depth > 0 && <span className="reply-branch">ㄴ</span>}
+    <div className={`reply-row ${isChild ? "is-child-row" : ""}`} style={{ paddingLeft: depth * 18 }}>
+      <div className={`reply-item ${isChild ? "is-child" : ""} ${isLast ? "is-last" : ""}`}>
+        {/* ✅ ㄴ 텍스트 삭제: CSS가 선/└ 그려줌 */}
+        <div className="reply-branch" aria-hidden="true" />
 
         <div className="reply-body">
           <div className="reply-meta">
-            <span className="reply-author">{reply.author || reply.username || "익명"}</span>
+            <span className="reply-author">{reply.displayAuthor || "익명"}</span>
             <span className="reply-date">
               {reply.created_at ? new Date(reply.created_at).toLocaleString() : ""}
             </span>
@@ -150,14 +135,14 @@ export default function ReplyItem({
           {!isEditing ? (
             <p className="reply-content">{reply.content}</p>
           ) : (
-            <div style={{ marginTop: 8 }}>
+            <div className="reply-edit-box">
               <textarea
                 className="form-textarea"
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 rows={3}
               />
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <div className="reply-edit-actions">
                 <button className="form-btn btn-submit" type="button" onClick={saveEdit}>
                   저장
                 </button>
@@ -169,46 +154,28 @@ export default function ReplyItem({
           )}
 
           <div className="reply-actions">
-            <button
-              className={`btn-reply-action ${isLiked ? "active" : ""}`}
-              onClick={handleReplyLike}
-              disabled={isEditing}
-            >
+            <button className={`btn-reply-action ${isLiked ? "active" : ""}`} onClick={handleReplyLike} disabled={isEditing}>
               {isLiked ? "❤️" : "🤍"} {likesCount}
             </button>
 
-            <button
-              className="btn-reply-action btn-report-sm"
-              onClick={handleReplyReport}
-              disabled={isEditing}
-            >
+            <button className="btn-reply-action btn-report-sm" onClick={handleReplyReport} disabled={isEditing}>
               🚨 신고
             </button>
 
-            {/* ==ADD: 답글 버튼== */}
-            <button
-              className="btn-reply-action"
-              onClick={() => setIsReplying((v) => !v)}
-              disabled={isEditing}
-            >
+            <button className="btn-reply-action" onClick={() => setIsReplying((v) => !v)} disabled={isEditing}>
               💬 답글
             </button>
 
             {canEdit && !isEditing && (
               <>
-                <button className="btn-reply-action" onClick={startEdit}>
-                  ✏️ 수정
-                </button>
-                <button className="btn-reply-action" onClick={handleDelete}>
-                  🗑 삭제
-                </button>
+                <button className="btn-reply-action" onClick={startEdit}>✏️ 수정</button>
+                <button className="btn-reply-action" onClick={handleDelete}>🗑 삭제</button>
               </>
             )}
           </div>
 
-          {/* ==ADD: 답글 입력창== */}
           {isReplying && (
-            <div className="reply-replybox">
+            <div className="reply-reply-box">
               <textarea
                 className="form-textarea"
                 rows={2}
@@ -216,7 +183,7 @@ export default function ReplyItem({
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
               />
-              <div className="reply-replybox-actions">
+              <div className="reply-edit-actions">
                 <button className="form-btn btn-submit" type="button" onClick={submitChildReply}>
                   등록
                 </button>
@@ -234,18 +201,18 @@ export default function ReplyItem({
             </div>
           )}
 
-          {/* ==ADD: 대댓글(자식) 재귀 렌더링== */}
           {Array.isArray(reply.replies) && reply.replies.length > 0 && (
             <div className="reply-children">
-              {reply.replies.map((child) => (
+              {reply.replies.map((child, idx) => (
                 <ReplyItem
                   key={child.id ?? child.comment_id ?? child.commentId}
                   reply={child}
                   me={me}
                   onActionSuccess={onActionSuccess}
-                  depth={depth + 1}     // ==ADD==
-                  boardType={boardType} // ==ADD==
-                  postId={postId}       // ==ADD==
+                  depth={depth + 1}
+                  boardType={boardType}
+                  postId={postId}
+                  isLast={idx === reply.replies.length - 1}   // ✅ 마지막이면 true
                 />
               ))}
             </div>

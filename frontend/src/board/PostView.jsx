@@ -55,9 +55,9 @@ export default function PostView() {
 
       const r = await listReplies(boardType, id);
 
-      // ✅ 익명번호 매핑 (user_id별로 익명 1,2...)
-      const anonMap = new Map(); // userId -> "익명 N"
-      let seq = 1;
+      // ✅ ADD: user_id별 익명 1,2... 매핑
+      const anonMap = new Map(); // userId -> number
+      let seq = 0;
 
       const normalized = Array.isArray(r)
         ? r.map((x) => {
@@ -67,14 +67,16 @@ export default function PostView() {
               x.user_id ?? x.userId ?? x.author_id ?? x.authorId
             );
 
-            if (Number.isFinite(uid) && !anonMap.has(uid)) {
-              anonMap.set(uid, `익명 ${seq++}`);
+            let displayAuthor = "익명";
+            if (Number.isFinite(uid)) {
+              if (!anonMap.has(uid)) anonMap.set(uid, ++seq);
+              displayAuthor = `익명 ${anonMap.get(uid)}`;
             }
 
             return {
               ...x,
               id: cid,
-              displayAuthor: anonMap.get(uid) || "익명",
+              displayAuthor, // ✅ ReplyItem에서 이걸로만 표시하게 할거임
             };
           })
         : [];
@@ -175,9 +177,9 @@ export default function PostView() {
     if (!text) return;
 
     try {
-      await submitReply(boardType, id, text);
+      await submitReply(boardType, id, text); // ✅ 일반 댓글
       setNewReplyText("");
-      await fetchDetail(); // ✅ 여기서 다시 불러오니까 댓글수도 자동 감소/증가 반영됨
+      await fetchDetail();
     } catch (err) {
       console.error("댓글 작성 실패:", err);
       if (err?.status === 401) alert("로그인이 필요합니다.");
@@ -326,6 +328,7 @@ export default function PostView() {
         {post.content}
       </div>
 
+      {/* 이미지 영역 생략(원본 유지) */}
       <div style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong>이미지</strong>
@@ -380,41 +383,6 @@ export default function PostView() {
         ) : (
           <div style={{ marginTop: 12, color: "#94a3b8" }}>표시할 이미지가 없습니다.</div>
         )}
-
-        {gallerySources.length > 1 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            {gallerySources.map((img) => (
-              <button
-                key={img.imageId || img.imageUrl}
-                onClick={() => setSelectedImageId(img.imageId || img.imageUrl)}
-                style={{
-                  border:
-                    activeImage &&
-                    (activeImage.imageId === img.imageId || activeImage.imageUrl === img.imageUrl)
-                      ? "2px solid #0ea5e9"
-                      : "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  padding: 0,
-                  background: "#0b1220",
-                  cursor: "pointer",
-                }}
-              >
-                <img
-                  src={img.imageUrl}
-                  alt="이미지 썸네일"
-                  style={{
-                    width: 120,
-                    height: 80,
-                    objectFit: "cover",
-                    display: "block",
-                    borderRadius: 7,
-                  }}
-                  loading="lazy"
-                />
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       <hr className="detail-separator" style={{ marginTop: 18 }} />
@@ -444,10 +412,10 @@ export default function PostView() {
                 key={reply.id}
                 reply={reply}
                 me={me}
-                postId={id}          
-                boardType={boardType} 
+                postId={id}
+                boardType={boardType}
                 onActionSuccess={fetchDetail}
-                depth={0}             // ==ADD==         
+                depth={0}
               />
             ))
           )}
