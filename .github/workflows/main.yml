@@ -220,13 +220,3 @@ jobs:
           docker rm -f ${FE_PREFIX}-${FE_OLD_COLOR} || true
 
           echo "🎉 Deployment complete"
-
-      - name: Deploy Rule API (Gemini classifier)
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI }}
-        run: |
-          echo "Writing rule-api env file"
-          echo "GEMINI_API_KEY=${GEMINI_API_KEY}" > /home/ec2-user/rule.env
-
-          echo "Starting rule-api (FastAPI Gemini classifier)"
-          docker compose --env-file /home/ec2-user/rule.env -f docker-compose.rule-api.yml up -d --build
