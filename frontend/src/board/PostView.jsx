@@ -4,23 +4,19 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   getBoardPost,
   deleteBoardPost,
-  addLike,        // ✅ 추가
-  listReplies,    // ✅ 추가 (GET /api/posts/:postId/comments)
-  submitReply,    // ✅ 추가 (POST /api/posts/:postId/comments)
+  addLike,
+  listReplies,
+  submitReply,
+  getPostLikeState, // ✅ 추가
 } from "../api/boards";
 
 import ReplyItem from "./ReplyItem";
-
-// == ADD ==
 import { getMe } from "../api/auth";
-// == ADD END ==
-
 
 export default function PostView() {
   const { boardType, id } = useParams();
   const navigate = useNavigate();
 
-  // ✅ 로그인 여부(accessToken 기준)
   const isLoggedIn = !!localStorage.getItem("accessToken");
 
   const [post, setPost] = useState(null);
@@ -28,25 +24,18 @@ export default function PostView() {
   const [loadError, setLoadError] = useState(null);
   const [selectedImageId, setSelectedImageId] = useState(null);
 
-  // ✅ 좋아요/댓글 상태
   const [isLiked, setIsLiked] = useState(false);
   const [replies, setReplies] = useState([]);
   const [newReplyText, setNewReplyText] = useState("");
 
-  // == ADD ==
   const [me, setMe] = useState(null);
-  // == ADD END ==
 
-  // 🔹 id가 정상적인 숫자인지 체크
   const isValidId =
     id !== undefined &&
     id !== "undefined" &&
     id !== "new" &&
     !Number.isNaN(Number(id));
 
-  // --------------------------
-  // ✅ 게시글 + 댓글 같이 불러오기
-  // --------------------------
   const fetchDetail = useCallback(async () => {
     if (!isValidId) {
       setLoading(false);
@@ -63,7 +52,7 @@ export default function PostView() {
       setPost(p);
       setSelectedImageId(null);
 
-      // ✅ 서버가 is_liked_by_me 내려주면 초기 좋아요 상태 세팅
+      // 서버가 is_liked_by_me 내려주면 초기 좋아요 상태 세팅
       setIsLiked(!!p?.is_liked_by_me);
 
       // 2) 댓글 불러오기
@@ -75,6 +64,23 @@ export default function PostView() {
           }))
         : [];
       setReplies(normalized);
+
+      // ==================================================
+      // ✅ 추가: 좋아요 상태/개수 DB 기준으로 덮어쓰기
+      // (posts 조회 SQL을 수정하지 않아도 좋아요 0으로 안 돌아감)
+      // ==================================================
+      try {
+        if (isLoggedIn) {
+          const s = await getPostLikeState(id);
+          setIsLiked(!!s?.liked);
+          setPost((prev) =>
+            prev ? { ...prev, likes: s?.likes ?? 0 } : prev
+          );
+        }
+      } catch (e) {
+        // 401 등은 무시 (로그인 아닐 때)
+      }
+      // ==================================================
     } catch (err) {
       console.error("게시글/댓글 불러오기 실패:", err);
       setLoadError("LOAD_FAIL");
@@ -83,13 +89,12 @@ export default function PostView() {
     } finally {
       setLoading(false);
     }
-  }, [boardType, id, isValidId]);
+  }, [boardType, id, isValidId, isLoggedIn]);
 
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
 
-  // == ADD: 내 정보 불러오기 ==
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
@@ -98,13 +103,8 @@ export default function PostView() {
       .then((r) => setMe(r?.me))
       .catch(() => setMe(null));
   }, []);
-  // == ADD END ==
 
-  // --------------------------
-  // ✅ 게시글 좋아요 토글
-  // --------------------------
   const handleLike = async () => {
-    // ✅ 로그인 전이면 안내만
     if (!isLoggedIn) {
       alert("로그인이 필요합니다.");
       return;
@@ -115,20 +115,18 @@ export default function PostView() {
     const wasLiked = isLiked;
     const delta = wasLiked ? -1 : 1;
 
-    // 낙관적 업데이트
     setIsLiked(!wasLiked);
     setPost((prev) =>
       prev ? { ...prev, likes: (prev.likes || 0) + delta } : prev
     );
 
     try {
-      // 서버: POST /api/posts/:postId/like  → { liked: true/false }
       const res = await addLike(boardType, id);
       setIsLiked(!!res?.liked);
+      // ✅ res에 likes는 현재 토글 API가 안 내려줘도 OK (like-state로 덮어쓰기 되니까)
     } catch (err) {
       console.error("좋아요 실패:", err);
 
-      // 롤백
       setIsLiked(wasLiked);
       setPost((prev) =>
         prev ? { ...prev, likes: (prev.likes || 0) - delta } : prev
@@ -139,16 +137,13 @@ export default function PostView() {
     }
   };
 
-  // --------------------------
-  // ✅ 댓글 작성 (기존 그대로)
-  // --------------------------
   const handleReplySubmit = async (e) => {
     e.preventDefault();
     const text = newReplyText.trim();
     if (!text) return;
 
     try {
-      await submitReply(boardType, id, text); // body: { content: text }
+      await submitReply(boardType, id, text);
       setNewReplyText("");
       await fetchDetail();
     } catch (err) {
@@ -158,9 +153,6 @@ export default function PostView() {
     }
   };
 
-  // --------------------------
-  // 삭제 기능 (기존)
-  // --------------------------
   const onDelete = async () => {
     if (!isValidId) return;
     if (!window.confirm("정말 삭제할까요?")) return;
@@ -172,9 +164,6 @@ export default function PostView() {
     navigate(`/board/${boardType}`);
   };
 
-  // --------------------------
-  // 잘못된 ID 처리 (기존)
-  // --------------------------
   if (!isValidId) {
     return (
       <div className="page-container fade-in">
@@ -188,9 +177,6 @@ export default function PostView() {
     );
   }
 
-  // --------------------------
-  // 로딩 / 에러 화면 (기존)
-  // --------------------------
   if (loading) {
     return <div className="page-container">불러오는 중...</div>;
   }
@@ -215,15 +201,10 @@ export default function PostView() {
     return <div className="page-container">게시글 정보가 없습니다.</div>;
   }
 
-  // == ADD: 작성자 판별 ==
   const myId = me ? Number(me.id ?? me.user_id ?? me.userId) : null;
   const ownerId = Number(post.user_id ?? post.author_id ?? post.userId ?? post.userId);
   const isOwner = myId !== null && ownerId === myId;
-  // == ADD END ==
 
-  // --------------------------
-  // ✅ 이미지 처리 로직 그대로
-  // --------------------------
   const images = Array.isArray(post.images) ? post.images : [];
   const attachments = Array.isArray(post.attachments) ? post.attachments : [];
 
@@ -284,17 +265,12 @@ export default function PostView() {
   const defaultImage = gallerySources[0] || null;
   const activeImage = selected || defaultImage;
 
-  // --------------------------
-  // 렌더링
-  // --------------------------
   return (
     <div className="page-container fade-in">
-      {/* 제목 */}
       <h2 className="page-title" style={{ border: "none", paddingBottom: 0 }}>
         {post.title}
       </h2>
 
-      {/* 메타 정보 */}
       <div className="post-meta" style={{ marginBottom: 16 }}>
         <span className="post-category" style={{ marginRight: 8 }}>
           {post.category}
@@ -305,12 +281,8 @@ export default function PostView() {
         </span>
       </div>
 
-      {/* ✅ 좋아요 버튼 */}
       <div className="post-actions-detail" style={{ marginBottom: 12 }}>
-        <button
-          className={`btn-action ${isLiked ? "active" : ""}`}
-          onClick={handleLike}
-        >
+        <button className={`btn-action ${isLiked ? "active" : ""}`} onClick={handleLike}>
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
       </div>
@@ -320,107 +292,12 @@ export default function PostView() {
         {post.address || "주소 정보 없음"}
       </div>
 
-      {/* 내용 */}
       <div className="post-content" style={{ whiteSpace: "pre-wrap" }}>
         {post.content}
       </div>
 
-      {/* 이미지 영역 */}
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <strong>이미지</strong>
-          {!hasProcessed && !!attachments.length && (
-            <span
-              style={{
-                fontSize: 12,
-                padding: "2px 8px",
-                borderRadius: 12,
-                background: "#f97316",
-                color: "#fff",
-              }}
-            >
-              처리 중 (원본 미리보기)
-            </span>
-          )}
-        </div>
-
-        {activeImage ? (
-          <div style={{ marginTop: 12 }}>
-            <div
-              style={{
-                width: "100%",
-                maxWidth: 960,
-                borderRadius: 16,
-                overflow: "hidden",
-                border: "1px solid #e5e7eb",
-                background: "#0f172a",
-              }}
-            >
-              <img
-                src={activeImage.imageUrl}
-                alt="게시 이미지"
-                style={{
-                  width: "100%",
-                  minHeight: 320,
-                  maxHeight: 640,
-                  objectFit: "contain",
-                  display: "block",
-                  background: "#0f172a",
-                }}
-                onError={(e) => {
-                  e.currentTarget.src =
-                    "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23232a3b'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%237884ab' font-size='20'%3E이미지를 불러올 수 없습니다%3C/text%3E%3C/svg%3E";
-                }}
-              />
-            </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
-              {activeImage.createdAt ? new Date(activeImage.createdAt).toLocaleString() : ""}
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginTop: 12, color: "#94a3b8" }}>표시할 이미지가 없습니다.</div>
-        )}
-
-        {gallerySources.length > 1 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            {gallerySources.map((img) => (
-              <button
-                key={img.imageId || img.imageUrl}
-                onClick={() => setSelectedImageId(img.imageId || img.imageUrl)}
-                style={{
-                  border:
-                    activeImage &&
-                    (activeImage.imageId === img.imageId ||
-                      activeImage.imageUrl === img.imageUrl)
-                      ? "2px solid #0ea5e9"
-                      : "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  padding: 0,
-                  background: "#0b1220",
-                  cursor: "pointer",
-                }}
-              >
-                <img
-                  src={img.imageUrl}
-                  alt="이미지 썸네일"
-                  style={{
-                    width: 120,
-                    height: 80,
-                    objectFit: "cover",
-                    display: "block",
-                    borderRadius: 7,
-                  }}
-                  loading="lazy"
-                />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       <hr className="detail-separator" style={{ marginTop: 18 }} />
 
-      {/* ✅ 댓글 섹션 (기존 그대로) */}
       <div className="replies-section">
         <h3>댓글 ({replies.length})</h3>
 
@@ -448,13 +325,11 @@ export default function PostView() {
         </div>
       </div>
 
-      {/* ✅ 하단 버튼 */}
       <div className="form-actions" style={{ marginTop: 24 }}>
         <Link className="form-btn btn-cancel" to={`/board/${boardType}`}>
           목록
         </Link>
 
-        {/* == CHANGE: 작성자만 수정/삭제 보이게 == */}
         {isOwner && (
           <>
             <Link className="form-btn btn-submit" to={`/board/${boardType}/${id}/edit`}>
@@ -466,7 +341,6 @@ export default function PostView() {
             </button>
           </>
         )}
-        {/* == CHANGE END == */}
       </div>
     </div>
   );

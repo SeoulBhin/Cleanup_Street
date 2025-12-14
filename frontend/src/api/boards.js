@@ -91,3 +91,7 @@ export function updateReply(replyId, content) {
 export function deleteReply(replyId) {
   return del(`/api/comments/${replyId}`);
 }
+
+export function getPostLikeState(postId) {
+  return getJSON(`/api/posts/${postId}/like-state`);
+}
