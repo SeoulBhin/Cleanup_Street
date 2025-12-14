@@ -12,19 +12,21 @@ export function getBoardPost(boardType, id) {
   return getJSON(`/api/posts/${id}`);
 }
 
-// ✅ 새 글 작성: content -> postBody 변환 + category 결정
+// src/api/boards.js 등
 export function createBoardPost(boardType, body) {
-  const { userId, user_id, content, postBody, ...rest } = body || {};
+  // category, userId 계열은 여기서 버립니다.
+  const { userId, user_id, content, postBody, category, ...rest } = body || {};
 
-  const finalCategory = rest.category ?? boardType ?? "기타";
   const finalPostBody = (content ?? postBody ?? "").toString();
 
   return postJSON(`/api/posts`, {
     ...rest,
-    category: finalCategory,
     postBody: finalPostBody,
+    autoCategory: true,   // ✅ 항상 자동 분류
+    // category는 아예 보내지 않음
   });
 }
+
 
 // ✅ 수정: content -> postBody 변환 + category 결정
 export function updateBoardPost(boardType, id, body) {
