@@ -27,6 +27,12 @@ async function fetchCompat(url, options) {
 const KOBERT_URL = process.env.KOBERT_URL; // http://127.0.0.1:7014/classify
 const KOBERT_ENABLED = !!process.env.KOBERT_URL;
 
+// 🔍 서버 시작 시 환경 상태 로그
+console.log("[POSTS][INIT_KOBERT]", {
+  KOBERT_URL,
+  KOBERT_ENABLED,
+});
+
 const ALLOWED_CATEGORIES = new Set([
   "도로-교통",
   "시설물-건축",
@@ -78,12 +84,20 @@ function normalizeCategory(raw) {
 
 
 async function classifyByKoBERT(text) {
-  if (!KOBERT_ENABLED) return null;
+  if (!KOBERT_ENABLED) {
+    console.log("[KoBERT] disabled: no KOBERT_URL env");
+    return null;
+  }
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 10000);
 
   try {
+    console.log("[KoBERT] request ->", {
+      url: KOBERT_URL,
+      textPreview: String(text).slice(0, 50), // 앞 50자만
+    });
+
     const res = await fetchCompat(KOBERT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,7 +105,11 @@ async function classifyByKoBERT(text) {
       signal: ac.signal,
     });
 
-    if (!res.ok) throw new Error(`KoBERT ${res.status}`);
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "");
+      console.warn("[KoBERT] bad status:", res.status, bodyText);
+      throw new Error(`KoBERT ${res.status}`);
+    }
 
     const data = await res.json();
 
@@ -103,6 +121,12 @@ async function classifyByKoBERT(text) {
       null;
 
     const norm = normalizeCategory(picked);
+
+    console.log("[KoBERT] response <-", {
+      raw: picked,
+      norm,
+    });
+
     if (!norm) return null;
 
     return ALLOWED_CATEGORIES.has(norm) ? norm : null;
@@ -113,6 +137,7 @@ async function classifyByKoBERT(text) {
     clearTimeout(timer);
   }
 }
+
 
 // =========================
 // uploads helpers
