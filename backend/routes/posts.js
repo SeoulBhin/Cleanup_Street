@@ -436,12 +436,11 @@ router.post("/", requireAuth, async (req, res) => {
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
       const g = await classifyByGemini(text);
-      const k = g ? null : await classifyByKoBERT(text);
-      const kw = g || k ? null : classifyByKeywords(title, postBody);
+      const kw = g ? null : classifyByKeywords(title, postBody);
 
-      finalCategory = g || k || kw || null;
+      finalCategory = g || kw || null;
 
-      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, k, kw });
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, kw });
     }
 
     if (!finalCategory) {
@@ -455,8 +454,6 @@ router.post("/", requireAuth, async (req, res) => {
       finalCategory,
       GEMINI_ENABLED,
       GEMINI_MODEL,
-      KOBERT_ENABLED,
-      KOBERT_URL,
     });
 
     // 5) preview 조회
@@ -629,12 +626,11 @@ router.put("/:postId", requireAuth, requirePostOwner, async (req, res) => {
     if (wantAuto) {
       const text = `${String(title)}\n${String(postBody)}`;
       const g = await classifyByGemini(text);
-      const k = g ? null : await classifyByKoBERT(text);
-      const kw = g || k ? null : classifyByKeywords(title, postBody);
+      const kw = g ? null : classifyByKeywords(title, postBody);
 
-      finalCategory = g || k || kw || null;
+      finalCategory = g || kw || null;
 
-      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, k, kw });
+      console.log("[POSTS][AUTO_CATEGORY_GEMINI]", { g, kw });
     }
 
     if (!finalCategory) {
