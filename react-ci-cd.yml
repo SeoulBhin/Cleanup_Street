@@ -97,3 +97,17 @@ jobs:
         docker rm cleanup-street-react-${NEW_COLOR}
         exit 1 # 배포 실패로 종료
 
+    - name: Post-build cleanup (safe)
+      run: |
+        echo "🧹 Post-build cleanup..."
+        docker buildx prune --keep-storage 2GB -f || true
+        docker system prune -a -f || true
+        if command -v dnf >/dev/null 2>&1; then
+          sudo dnf clean all || true
+          sudo rm -rf /var/cache/dnf || true
+        elif command -v apt-get >/dev/null 2>&1; then
+          sudo apt-get clean || true
+          sudo rm -rf /var/cache/apt/archives/* || true
+        fi
+        sudo journalctl --vacuum-size=200M || true
+

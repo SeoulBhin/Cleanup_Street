@@ -170,3 +170,17 @@ jobs:
         docker rm -f ${{ env.CONTAINER_PREFIX }}-${OLD_COLOR} || true
 
         echo "🎉 Deployment complete and Nginx switched to ${NEW_COLOR} (port ${NEW_PORT})"
+
+    - name: Post-build cleanup (safe)
+      run: |
+        echo "🧹 Post-build cleanup..."
+        docker buildx prune --keep-storage 2GB -f || true
+        docker system prune -a -f || true
+        if command -v dnf >/dev/null 2>&1; then
+          sudo dnf clean all || true
+          sudo rm -rf /var/cache/dnf || true
+        elif command -v apt-get >/dev/null 2>&1; then
+          sudo apt-get clean || true
+          sudo rm -rf /var/cache/apt/archives/* || true
+        fi
+        sudo journalctl --vacuum-size=200M || true
