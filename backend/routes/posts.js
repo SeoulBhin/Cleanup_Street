@@ -401,6 +401,16 @@ router.post("/", requireAuth, async (req, res) => {
       finalCategory =
         requested && ALLOWED_CATEGORIES.has(requested) ? requested : "기타";
     }
+        // 🔍 자동 분류 디버그용 로그
+    console.log("[POSTS][AUTO_CATEGORY_DEBUG]", {
+      title,
+      wantAuto,
+      requested,
+      finalCategory,
+      KOBERT_ENABLED,
+      KOBERT_URL,
+    });
+
 
     // 5) preview 조회
     let previewData = null;
