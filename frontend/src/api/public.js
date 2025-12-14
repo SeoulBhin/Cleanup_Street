@@ -11,7 +11,7 @@ export async function getAnnouncements() {
     return await getJSON("/api/announcements");
   } catch {
     return [
-      { id: 1, title: "[필독] 와챠우! 커뮤니티 이용 규칙 안내", author: "관리자", date: "2025-10-15" },
+      { id: 1, title: "[필독] 와챠웃! 커뮤니티 이용 규칙 안내", author: "관리자", date: "2025-10-15" },
       { id: 2, title: "개인정보 처리 방침 개정 안내", author: "관리자", date: "2025-10-10" },
       { id: 3, title: "서버 점검 예정 (오전 2시 ~ 4시)", author: "관리자", date: "2025-10-05" },
     ];
