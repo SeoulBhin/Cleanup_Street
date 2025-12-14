@@ -202,6 +202,19 @@ export default function PostView() {
     navigate(`/board/${boardType}`);
   };
 
+  const countAllReplies = (nodes) => {
+  if (!Array.isArray(nodes)) return 0;
+
+  let count = 0;
+  for (const node of nodes) {
+    count += 1; // 자기 자신
+    if (Array.isArray(node.replies) && node.replies.length > 0) {
+      count += countAllReplies(node.replies);
+    }
+  }
+  return count;
+};
+
   if (!isValidId) {
     return (
       <div className="page-container fade-in">
@@ -411,7 +424,7 @@ export default function PostView() {
       <hr className="detail-separator" style={{ marginTop: 18 }} />
 
       <div className="replies-section">
-        <h3>댓글 ({replies.length})</h3>
+        <h3>댓글 ({countAllReplies(replies)})</h3>
 
         <form onSubmit={handleReplySubmit} className="reply-form">
           <textarea
