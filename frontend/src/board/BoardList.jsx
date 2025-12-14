@@ -10,7 +10,7 @@ export default function BoardList() {
   const [sp, setSp] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-   const [me, setMe] = useState(null);
+  const [me, setMe] = useState(null);
 
   const q = sp.get("q") || "";
   const selected = sp.get("cat") || "전체";
@@ -88,6 +88,7 @@ export default function BoardList() {
     fetchList();
   };
 
+  
   return (
     <div className="page-container fade-in">
       <div className="forum-header">
@@ -117,14 +118,17 @@ export default function BoardList() {
         <button
           className={`category-btn ${selected === "전체" ? "active" : ""}`}
           onClick={() => pickCat("전체")}
+          type="button"
         >
           전체
         </button>
+
         {FORUM_CATEGORIES.map((c) => (
           <button
             key={c}
             className={`category-btn ${selected === c ? "active" : ""}`}
             onClick={() => pickCat(c)}
+            type="button"
           >
             {c}
           </button>
@@ -136,36 +140,60 @@ export default function BoardList() {
       ) : (
         <div className="list-container">
           {filtered.length === 0 && <div>게시글이 없습니다.</div>}
-          {filtered.map((p) => (
-            <div key={p.id} className="list-item forum-post">
-              <div className="post-header">
-                <span className="post-category">{p.category}</span>
-                <h3 className="list-item-title">
-                  <Link to={`/board/${boardType}/${p.id}`}>{p.title}</Link>
-                </h3>
-              </div>
-              <p className="post-content">{p.content}</p>
-              <div className="post-meta-wrapper">
-                <div className="post-meta">
-                  <span>작성자: {p.author || "익명"}</span> |{" "}
-                  <span>
-                    작성일:{" "}
-                    {p.created_at
-                      ? new Date(p.created_at).toLocaleDateString()
-                      : "-"}
-                  </span>
+
+          {filtered.map((p) => {
+            // == ADD: 작성자만 버튼 보이게 ==
+            const myId = me ? Number(me.id ?? me.user_id ?? me.userId) : null;
+            const isOwner =
+              myId !== null && Number(p.user_id) === myId;
+            // == ADD END ==
+
+            return (
+              <div key={p.id} className="list-item forum-post">
+                <div className="post-header">
+                  <span className="post-category">{p.category}</span>
+                  <h3 className="list-item-title">
+                    <Link to={`/board/${boardType}/${p.id}`}>{p.title}</Link>
+                  </h3>
                 </div>
-                <div className="post-actions">
-                  <Link to={`/board/${boardType}/${p.id}/edit`} className="btn-edit">
-                    수정
-                  </Link>
-                  <button className="btn-delete" onClick={() => onDelete(p.id)}>
-                    삭제
-                  </button>
+
+                <p className="post-content">{p.content}</p>
+
+                <div className="post-meta-wrapper">
+                  <div className="post-meta">
+                    <span>작성자: {p.author || "익명"}</span> |{" "}
+                    <span>
+                      작성일:{" "}
+                      {p.created_at
+                        ? new Date(p.created_at).toLocaleDateString()
+                        : "-"}
+                    </span>
+                  </div>
+
+                  <div className="post-actions">
+                    {/* == CHANGE: 작성자만 수정/삭제 노출 == */}
+                    {isOwner && (
+                      <>
+                        <Link
+                          to={`/board/${boardType}/${p.id}/edit`}
+                          className="btn-edit"
+                        >
+                          수정
+                        </Link>
+                        <button
+                          className="btn-delete"
+                          onClick={() => onDelete(p.id)}
+                        >
+                          삭제
+                        </button>
+                      </>
+                    )}
+                    {/* == CHANGE END == */}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
