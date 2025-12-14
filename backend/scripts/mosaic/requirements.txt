@@ -15,8 +15,3 @@ opencv-python==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
 
-# 5. Gemini
-fastapi
-uvicorn
-pydantic
-google-generativeai>=0.8.3
