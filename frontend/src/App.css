@@ -11,7 +11,7 @@ font-family: 'Noto Sans KR', sans-serif; /* 기본 폰트 */
 
 /* 모든 요소의 padding과 border가 너비에 포함되도록 설정 */
 * {
-  box-sizing: border-box;
+  box-sizing: border-box; 
 }
 
 /* ===================================================================================
