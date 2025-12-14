@@ -15,4 +15,8 @@ opencv-python==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
 
-# 5. (Kobert는 사용하지 않으므로 관련 라이브러리 제거됨)
+# 5. Gemini
+fastapi
+uvicorn
+pydantic
+google-generativeai>=0.8.3
