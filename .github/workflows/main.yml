@@ -24,6 +24,7 @@ jobs:
       RETRIES: 12
       RETRY_INTERVAL: 5
       BACKEND_ENV_FILE: /home/ec2-user/backend.env
+      GEMINI_API_KEY: ${{ secrets.GEMINI }}
 
     steps:
       # github repository에서 checkout
@@ -60,6 +61,7 @@ jobs:
       - name: Deploy with Blue/Green Strategy
         env:
           IMAGE_TAG: ${{ github.sha }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI }}
           # DB Configuration
           DB_HOST: 52.63.57.185
           DB_PORT: 5433
@@ -148,6 +150,7 @@ jobs:
             -e FRONTEND_URL="${FRONTEND_URL}" \
             -e NAVER_CLIENT_ID_Map="${NAVER_CLIENT_ID_Map}" \
             -e NAVER_CLIENT_SECRET_Map="${NAVER_CLIENT_SECRET_Map}" \
+            -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
             ${BE_IMAGE}:${IMAGE_TAG}
 
           # Frontend

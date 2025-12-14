@@ -15,10 +15,4 @@ opencv-python==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
 
-# 5. 새로 추가 Kobert를 위한 라이브러리
-transformers
-datasets
-pandas
-fastapi
-uvicorn
-pydantic
+# 5. (Kobert는 사용하지 않으므로 관련 라이브러리 제거됨)
