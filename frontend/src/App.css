@@ -408,7 +408,7 @@ body {
    ======================= */
 .reply-row {
     border-top: 1px solid #e5e7eb;
-    padding: 0; /* 댓글 간격 축소 */
+    padding: 6px 0; /* 댓글 간격 축소 */
 }
 .reply-row:first-child {
     border-top: none;
@@ -417,6 +417,7 @@ body {
     display: flex;
     gap: 8px; /* 브랜치 선과 본문 간격 축소 */
     position: relative;
+    align-items: flex-start;
 }
 .reply-body {
     flex-grow: 1; 
@@ -433,8 +434,8 @@ body {
     content: "";
     position: absolute;
     left: 8px;
-    top: -10px; 
-    bottom: 5px; 
+    top: 0px; 
+    bottom: 0px; 
     width: 1px;
     background: #e5e7eb;
 }
@@ -442,7 +443,7 @@ body {
     content: "";
     position: absolute;
     left: 8px;
-    top: 5px; 
+    top: 8px; 
     width: 10px;
     height: 1px;
     background: #e5e7eb;
