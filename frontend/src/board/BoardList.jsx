@@ -29,7 +29,16 @@ export default function BoardList() {
         
         // 💡 수정된 부분: list가 배열인지 확인하고, 아니면 빈 배열을 사용합니다.
         const safeList = Array.isArray(list) ? list : []; 
-        setRows(safeList);
+         // == 추가: id 정규화 + undefined 제거 ==
+      const normalized = safeList
+        .map((r) => ({
+          ...r,
+          id: r.id ?? r.post_id ?? r.postId, // ✅ 핵심
+        }))
+        .filter((r) => r.id !== undefined && r.id !== null);
+
+      // == 변경: safeList 말고 normalized로 저장 ==
+      setRows(normalized);
         
     } catch (error) {
         console.error("게시글 목록 로딩 오류:", error);
