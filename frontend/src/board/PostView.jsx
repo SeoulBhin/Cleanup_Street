@@ -54,12 +54,31 @@ export default function PostView() {
       setIsLiked(!!p?.is_liked_by_me);
 
       const r = await listReplies(boardType, id);
+
+      // ✅ 익명번호 매핑 (user_id별로 익명 1,2...)
+      const anonMap = new Map(); // userId -> "익명 N"
+      let seq = 1;
+
       const normalized = Array.isArray(r)
-        ? r.map((x) => ({
-            ...x,
-            id: x.id ?? x.comment_id ?? x.commentId,
-          }))
+        ? r.map((x) => {
+            const cid = x.id ?? x.comment_id ?? x.commentId;
+
+            const uid = Number(
+              x.user_id ?? x.userId ?? x.author_id ?? x.authorId
+            );
+
+            if (Number.isFinite(uid) && !anonMap.has(uid)) {
+              anonMap.set(uid, `익명 ${seq++}`);
+            }
+
+            return {
+              ...x,
+              id: cid,
+              displayAuthor: anonMap.get(uid) || "익명",
+            };
+          })
         : [];
+
       setReplies(normalized);
 
       try {
@@ -158,7 +177,7 @@ export default function PostView() {
     try {
       await submitReply(boardType, id, text);
       setNewReplyText("");
-      await fetchDetail();
+      await fetchDetail(); // ✅ 여기서 다시 불러오니까 댓글수도 자동 감소/증가 반영됨
     } catch (err) {
       console.error("댓글 작성 실패:", err);
       if (err?.status === 401) alert("로그인이 필요합니다.");
@@ -293,11 +312,7 @@ export default function PostView() {
           {isLiked ? "❤️ 좋아요 취소" : "🤍 좋아요"} ({post.likes || 0})
         </button>
 
-        <button
-          className="btn-action btn-report"
-          onClick={handleReportPost}
-          style={{ marginLeft: 8 }}
-        >
+        <button className="btn-action btn-report" onClick={handleReportPost} style={{ marginLeft: 8 }}>
           🚨 신고
         </button>
       </div>
@@ -375,8 +390,7 @@ export default function PostView() {
                 style={{
                   border:
                     activeImage &&
-                    (activeImage.imageId === img.imageId ||
-                      activeImage.imageUrl === img.imageUrl)
+                    (activeImage.imageId === img.imageId || activeImage.imageUrl === img.imageUrl)
                       ? "2px solid #0ea5e9"
                       : "1px solid #e5e7eb",
                   borderRadius: 8,
@@ -429,7 +443,7 @@ export default function PostView() {
               <ReplyItem
                 key={reply.id}
                 reply={reply}
-                me={me}                 
+                me={me}
                 onActionSuccess={fetchDetail}
               />
             ))

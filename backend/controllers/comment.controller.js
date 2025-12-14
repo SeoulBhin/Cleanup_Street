@@ -1,4 +1,4 @@
-const { pool } = require('../db');
+const { pool } = require("../db");
 
 exports.listComments = async (req, res) => {
   try {
@@ -16,8 +16,8 @@ exports.listComments = async (req, res) => {
     const map = {};
     const result = [];
 
-    rows.forEach(c => (map[c.comment_id] = { ...c, replies: [] }));
-    rows.forEach(c => {
+    rows.forEach((c) => (map[c.comment_id] = { ...c, replies: [] }));
+    rows.forEach((c) => {
       if (c.parent_id) {
         map[c.parent_id]?.replies.push(map[c.comment_id]);
       } else {
@@ -27,8 +27,8 @@ exports.listComments = async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error('[listComments]', err);
-    res.status(500).json({ message: '댓글 조회 실패' });
+    console.error("[listComments]", err);
+    res.status(500).json({ message: "댓글 조회 실패" });
   }
 };
 
@@ -36,10 +36,10 @@ exports.addComment = async (req, res) => {
   try {
     const { postId } = req.params;
     const { content, parent_id = null } = req.body;
-    const userId = req.user.userId; 
+    const userId = req.user.userId;
 
     if (!content || !content.trim()) {
-      return res.status(400).json({ message: '댓글 내용이 필요합니다.' });
+      return res.status(400).json({ message: "댓글 내용이 필요합니다." });
     }
 
     const { rows } = await pool.query(
@@ -119,19 +119,19 @@ exports.addComment = async (req, res) => {
 
     res.status(201).json(newComment);
   } catch (err) {
-    console.error('[addComment]', err);
-    res.status(500).json({ message: '댓글 작성 실패' });
+    console.error("[addComment]", err);
+    res.status(500).json({ message: "댓글 작성 실패" });
   }
 };
 
 exports.editComment = async (req, res) => {
   try {
-    const { id } = req.params;         
+    const { id } = req.params;
     const { content } = req.body;
     const userId = req.user.userId;
 
     if (!content || !content.trim()) {
-      return res.status(400).json({ message: '댓글 내용이 필요합니다.' });
+      return res.status(400).json({ message: "댓글 내용이 필요합니다." });
     }
 
     const { rows } = await pool.query(
@@ -143,35 +143,39 @@ exports.editComment = async (req, res) => {
     );
 
     if (!rows[0]) {
-      return res.status(404).json({ message: '댓글을 찾을 수 없거나 수정 권한이 없습니다.' });
+      return res
+        .status(404)
+        .json({ message: "댓글을 찾을 수 없거나 수정 권한이 없습니다." });
     }
 
     res.json(rows[0]);
   } catch (err) {
-    console.error('[editComment]', err);
-    res.status(500).json({ message: '댓글 수정 실패' });
+    console.error("[editComment]", err);
+    res.status(500).json({ message: "댓글 수정 실패" });
   }
 };
 
+// ✅ 완전 삭제(DELETE) 버전: [deleted] 안 남김
 exports.deleteComment = async (req, res) => {
   try {
-    const { id } = req.params;     
+    const { id } = req.params;
     const userId = req.user.userId;
 
     const r = await pool.query(
-      `UPDATE public.comments
-       SET content = '[deleted]'
+      `DELETE FROM public.comments
        WHERE comment_id = $1 AND user_id = $2`,
       [id, userId]
     );
 
     if (r.rowCount === 0) {
-      return res.status(404).json({ message: '댓글을 찾을 수 없거나 삭제 권한이 없습니다.' });
+      return res
+        .status(404)
+        .json({ message: "댓글을 찾을 수 없거나 삭제 권한이 없습니다." });
     }
 
     res.json({ success: true });
   } catch (err) {
-    console.error('[deleteComment]', err);
-    res.status(500).json({ message: '댓글 삭제 실패' });
+    console.error("[deleteComment]", err);
+    res.status(500).json({ message: "댓글 삭제 실패" });
   }
 };

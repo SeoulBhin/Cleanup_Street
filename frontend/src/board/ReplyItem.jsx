@@ -14,7 +14,7 @@ export default function ReplyItem({ reply, onActionSuccess, me }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(reply.content || "");
 
-  // ✅ 내 댓글만 수정/삭제 가능 (서버 수정 없이 프론트에서 판별)
+  // ✅ 내 댓글만 수정/삭제 가능
   const myId = Number(me?.id ?? me?.user_id ?? me?.userId);
   const authorId = Number(reply?.user_id ?? reply?.author_id ?? reply?.userId);
   const canEdit =
@@ -105,7 +105,8 @@ export default function ReplyItem({ reply, onActionSuccess, me }) {
     <div className="reply-item">
       <div className="reply-meta">
         <span className="reply-author">
-          {reply.author || reply.username || "익명"}
+          {/* ✅ 여기만 바뀜: displayAuthor 우선 */}
+          {reply.displayAuthor || "익명"}
         </span>
         <span className="reply-date">
           {reply.created_at ? new Date(reply.created_at).toLocaleString() : ""}
