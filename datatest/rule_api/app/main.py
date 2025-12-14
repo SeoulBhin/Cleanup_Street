@@ -9,6 +9,15 @@ from pydantic import BaseModel
 import google.generativeai as genai
 
 # -----------------------------
+# 로깅 기본 설정 (터미널에 보기 좋게)
+# -----------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# -----------------------------
 # 설정 / 환경변수
 # -----------------------------
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -31,8 +40,6 @@ CATEGORIES = [
     "기타",
     "스팸",
 ]
-
-logger = logging.getLogger(__name__)
 
 
 # -----------------------------
@@ -127,6 +134,15 @@ def classify(req: ClassifyReq):
 
         if cat not in CATEGORIES:
             raise ValueError(f"예상치 못한 카테고리 응답: {raw!r} -> {cat!r}")
+
+        # 🔍 디버그 로그: 실제 입력·원본 응답·최종 카테고리 확인
+        logger.info(
+            "[CLASSIFY] input=%r raw=%r category=%r",
+            text[:80],
+            raw[:80],
+            cat,
+        )
+
         return {"category": cat}
 
     except Exception as e:
