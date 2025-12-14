@@ -408,7 +408,7 @@ body {
    ======================= */
 .reply-row {
     border-top: 1px solid #e5e7eb;
-    padding: 8px 0; /* 댓글 간격 축소 */
+    padding: 0; /* 댓글 간격 축소 */
 }
 .reply-row:first-child {
     border-top: none;
