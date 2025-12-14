@@ -2,7 +2,6 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 시스템 타임존/로케일 관련 패키지는 생략하고, 런타임 최소화
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
