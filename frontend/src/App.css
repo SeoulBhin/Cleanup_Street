@@ -442,6 +442,22 @@ background: linear-gradient(to right, #ef4444, #3b82f6);
   border: none;
 }
 
+.reply-meta{
+  display: flex;
+  align-items: center;
+  gap: 10px;        /* 간격 */
+  flex-wrap: wrap;  /* 좁으면 줄바꿈 */
+}
+
+.reply-author{
+  font-weight: 600;
+}
+
+.reply-date{
+  color: #6b7280;
+  font-size: 12px;
+}
+
 .login-section .btn {
  font-weight: 600;
  padding: 0.25rem 0.75rem;
