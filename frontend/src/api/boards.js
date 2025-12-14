@@ -28,19 +28,26 @@ export function createBoardPost(boardType, body) {
 }
 
 
-// ✅ 수정: content -> postBody 변환 + category 결정
 export function updateBoardPost(boardType, id, body) {
-  const { userId, user_id, content, postBody, ...rest } = body || {};
-
-  const finalCategory = rest.category ?? boardType ?? "기타";
+  const { userId, user_id, content, postBody, autoCategory, ...rest } = body || {};
   const finalPostBody = (content ?? postBody ?? "").toString();
 
-  return putJSON(`/api/posts/${id}`, {
+  // ✅ 자동분류는 "명시적으로 true로 들어온 경우에만" 켭니다.
+  const wantAuto = autoCategory === true;
+
+  const payload = {
     ...rest,
-    category: finalCategory,
     postBody: finalPostBody,
-  });
+    autoCategory: wantAuto,
+  };
+
+  // ✅ 자동분류면 category를 보내지 않습니다(서버가 분류).
+  // ✅ 자동분류가 아니면 category가 들어온 경우에만 보냅니다.
+  if (!wantAuto && rest.category != null) payload.category = rest.category;
+
+  return putJSON(`/api/posts/${id}`, payload);
 }
+
 
 export function deleteBoardPost(boardType, id) {
   return del(`/api/posts/${id}`);
