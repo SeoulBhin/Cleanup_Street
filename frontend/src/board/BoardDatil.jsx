@@ -23,7 +23,7 @@ export default function BoardDetail() {
     const [newReplyText, setNewReplyText] = useState('');
     const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
 
-    // 🚨 댓글 페이지네이션 상태 추가
+    // 댓글 페이지네이션 상태
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     
@@ -34,7 +34,7 @@ export default function BoardDetail() {
             const res = await listReplies(boardType, id, {
                 page: page,
                 limit: REPLIES_PER_PAGE,
-                sort: 'desc', 
+                sort: 'desc', // 최신 댓글이 목록의 가장 위에 표시되도록 정렬
             });
             
             // 서버 응답 형태를 { data: [...replies], total: 20 }로 가정
@@ -126,7 +126,8 @@ export default function BoardDetail() {
             await submitReply(boardType, id, newReplyText); 
 
             setNewReplyText('');
-            fetchReplies(1); 
+            // 댓글 작성 후, 최신 댓글이 있는 1페이지를 다시 불러옴 (댓글 폼 위쪽으로 형성)
+            await fetchReplies(1); 
         } catch (error) {
             alert("댓글 작성에 실패했습니다.");
         }
@@ -168,18 +169,7 @@ export default function BoardDetail() {
                     {/* 전체 댓글 수는 post 객체에서 가져온다고 가정 */}
                     <h3>댓글 ({post.comments_count || 0})</h3>
                     
-                    {/* 댓글 작성 폼 (가장 위에 위치) */}
-                    <form onSubmit={handleReplySubmit} className="reply-form">
-                        <textarea
-                            className="form-textarea"
-                            placeholder="댓글을 입력하세요"
-                            value={newReplyText}
-                            onChange={(e) => setNewReplyText(e.target.value)}
-                            rows={3}
-                        />
-                        <button type="submit" className="form-btn btn-submit">등록</button>
-                    </form>
-
+                    {/* 댓글 목록 (작성 폼 위쪽) */}
                     <div className="reply-list">
                         {replies.length === 0 ? (
                             <p className="no-replies">아직 댓글이 없습니다.</p>
@@ -194,8 +184,8 @@ export default function BoardDetail() {
                             ))
                         )}
                     </div>
-                    
-                    {/* 페이지네이션 컨트롤 */}
+
+                    {/* 페이지네이션 컨트롤 (목록 바로 아래) */}
                     {totalPages > 1 && (
                         <div className="pagination-controls">
                             <button
@@ -217,6 +207,18 @@ export default function BoardDetail() {
                             </button>
                         </div>
                     )}
+                    
+                    {/* 댓글 작성 폼 (가장 아래 위치) */}
+                    <form onSubmit={handleReplySubmit} className="reply-form-bottom"> 
+                        <textarea
+                            className="form-textarea"
+                            placeholder="댓글을 입력하세요"
+                            value={newReplyText}
+                            onChange={(e) => setNewReplyText(e.target.value)}
+                            rows={3}
+                        />
+                        <button type="submit" className="form-btn btn-submit">등록</button>
+                    </form>
                 </div>
             </div>
             
