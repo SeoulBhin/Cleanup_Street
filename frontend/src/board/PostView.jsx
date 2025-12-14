@@ -37,6 +37,70 @@ export default function PostView() {
     id !== "new" &&
     !Number.isNaN(Number(id));
 
+  // ✅ ADD: flat 댓글 -> 트리 + 익명번호(user_id 기준) 고정
+  const buildReplyTreeWithAnon = (flatReplies) => {
+    const anonMap = new Map(); // userId -> number
+    let seq = 0;
+
+    const nodeMap = new Map(); // replyId -> node
+
+    const normalized = (Array.isArray(flatReplies) ? flatReplies : []).map((x) => {
+      const cid = x.id ?? x.comment_id ?? x.commentId;
+
+      const uidRaw = x.user_id ?? x.userId ?? x.author_id ?? x.authorId;
+      const uid = uidRaw === null || uidRaw === undefined ? NaN : Number(uidRaw);
+
+      let displayAuthor = "익명";
+      if (Number.isFinite(uid)) {
+        if (!anonMap.has(uid)) anonMap.set(uid, ++seq);
+        displayAuthor = `익명 ${anonMap.get(uid)}`;
+      }
+
+      const parentId =
+        x.parent_id ??
+        x.parentId ??
+        x.parent_comment_id ??
+        x.parentCommentId ??
+        null;
+
+      const node = {
+        ...x,
+        id: cid,
+        parentId,
+        displayAuthor,
+        replies: [], // 자식 담기
+      };
+
+      nodeMap.set(node.id, node);
+      return node;
+    });
+
+    const roots = [];
+    for (const node of normalized) {
+      const pid = node.parentId;
+      if (pid && nodeMap.has(pid)) {
+        nodeMap.get(pid).replies.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    // (선택) 시간순 정렬
+    const sortByCreatedAt = (arr) => {
+      arr.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return ta - tb;
+      });
+      for (const n of arr) {
+        if (Array.isArray(n.replies) && n.replies.length > 0) sortByCreatedAt(n.replies);
+      }
+    };
+    sortByCreatedAt(roots);
+
+    return roots;
+  };
+
   const fetchDetail = useCallback(async () => {
     if (!isValidId) {
       setLoading(false);
@@ -55,33 +119,9 @@ export default function PostView() {
 
       const r = await listReplies(boardType, id);
 
-      // ✅ ADD: user_id별 익명 1,2... 매핑
-      const anonMap = new Map(); // userId -> number
-      let seq = 0;
-
-      const normalized = Array.isArray(r)
-        ? r.map((x) => {
-            const cid = x.id ?? x.comment_id ?? x.commentId;
-
-            const uid = Number(
-              x.user_id ?? x.userId ?? x.author_id ?? x.authorId
-            );
-
-            let displayAuthor = "익명";
-            if (Number.isFinite(uid)) {
-              if (!anonMap.has(uid)) anonMap.set(uid, ++seq);
-              displayAuthor = `익명 ${anonMap.get(uid)}`;
-            }
-
-            return {
-              ...x,
-              id: cid,
-              displayAuthor, // ✅ ReplyItem에서 이걸로만 표시하게 할거임
-            };
-          })
-        : [];
-
-      setReplies(normalized);
+      // ✅ IMPORTANT: flat -> tree + 익명번호 고정
+      const tree = buildReplyTreeWithAnon(r);
+      setReplies(tree);
 
       try {
         if (isLoggedIn) {
@@ -177,7 +217,7 @@ export default function PostView() {
     if (!text) return;
 
     try {
-      await submitReply(boardType, id, text); // ✅ 일반 댓글
+      await submitReply(boardType, id, text); // 일반 댓글
       setNewReplyText("");
       await fetchDetail();
     } catch (err) {
@@ -328,7 +368,7 @@ export default function PostView() {
         {post.content}
       </div>
 
-      {/* 이미지 영역 생략(원본 유지) */}
+      {/* 이미지 영역(원본 유지) */}
       <div style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <strong>이미지</strong>
