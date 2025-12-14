@@ -297,7 +297,7 @@ app.get("/api/announcements", (req, res) => {
   res.json([
     {
       id: 1,
-      title: "[필독] 와챠우! 커뮤니티 이용 규칙 안내",
+      title: "[필독] 와챠웃! 커뮤니티 이용 규칙 안내",
       author: "관리자",
       date: "2025-10-15",
     },
