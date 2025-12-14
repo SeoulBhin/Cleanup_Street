@@ -24,7 +24,7 @@ async function fetchCompat(url, options) {
 // =========================
 // KoBERT 호출 (자동 분류)
 // =========================
-const KOBERT_URL = process.env.KOBERT_URL; // 예: http://127.0.0.1:7014/predict
+const KOBERT_URL = process.env.KOBERT_URL; // http://127.0.0.1:7014/classify
 const KOBERT_ENABLED = !!process.env.KOBERT_URL;
 
 const ALLOWED_CATEGORIES = new Set([
