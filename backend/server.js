@@ -450,6 +450,7 @@ app.get("/api/map", async (req, res) => {
         p.post_id AS id,
         p.title,
         p.content,
+        p.address,
         p.latitude  AS lat,
         p.longitude AS lng,
         p.h3_index::text AS h3_cell,
@@ -491,7 +492,12 @@ app.get("/api/map", async (req, res) => {
 
     if (!rows.length) {
       console.log("⚠ DB 없음 → FALLBACK 반환");
-      return res.json(FALLBACK);
+      return res.json(
+        FALLBACK.map((r) => ({
+          ...r,
+          address: "주소 정보 없음",
+        }))
+      );
     }
 
     console.log("📌 DB 지도 데이터 rows:", rows);
