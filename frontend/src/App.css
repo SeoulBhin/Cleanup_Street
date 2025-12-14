@@ -34,7 +34,7 @@ body {
     min-height: 100vh;
 }
 .app-header {
-    background: #f97316;
+    background: #f97316; /* 주황색 테마 */
     color: white;
     padding: 1rem;
     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
@@ -194,7 +194,7 @@ body {
 }
 .nav-item.active {
     background-color: white;
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
     font-weight: 700;
 }
@@ -216,7 +216,7 @@ body {
     color: #1f2937;
     margin: 0 0 1.5rem 0;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #f97316;
+    border-bottom: 2px solid #f97316; /* 주황색 테마 */
 }
 .home-page {
     width: 100%;
@@ -255,7 +255,7 @@ body {
 }
 .intro-page .highlight {
     font-weight: 600;
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
 }
 
 /* ===================================================================================
@@ -295,7 +295,7 @@ body {
     align-items: center;
     margin-bottom: 1.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #f97316;
+    border-bottom: 2px solid #f97316; /* 주황색 테마 */
     flex-wrap: wrap;
     gap: 1rem;
 }
@@ -381,8 +381,8 @@ body {
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus {
     outline: none;
-    border-color: #f97316;
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5);
+    border-color: #f97316; /* 주황색 테마 */
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5); /* 주황색 테마 */
 }
 .form-textarea {
     min-height: 150px;
@@ -476,7 +476,7 @@ body {
 }
 .login-section .btn-login {
     background-color: white;
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
 }
 .login-section .btn-login:hover {
     background-color: #e5e7eb;
@@ -489,7 +489,7 @@ body {
     background-color: #eab308;
 }
 .btn-write {
-    background-color: #f97316;
+    background-color: #f97316; /* 주황색 테마 */
     color: white;
     font-weight: 700;
     padding: 0.5rem 1.5rem;
@@ -498,7 +498,7 @@ body {
     white-space: nowrap;
 }
 .btn-write:hover {
-    background-color: #ea580c;
+    background-color: #ea580c; /* 주황색 테마 */
 }
 .category-btn {
     background-color: #e5e7eb;
@@ -511,7 +511,7 @@ body {
     background-color: #d1d5db;
 }
 .category-btn.active {
-    background-color: #f97316;
+    background-color: #f97316; /* 주황색 테마 */
     color: white;
     font-weight: 700;
 }
@@ -522,10 +522,10 @@ body {
     border-radius: 0.25rem;
 }
 .btn-edit {
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
 }
 .btn-edit:hover {
-    background-color: #fff7ed;
+    background-color: #fff7ed; /* 연한 주황색 테마 */
 }
 .btn-delete {
     color: #ef4444;
@@ -546,15 +546,15 @@ body {
     background-color: #4b5563;
 }
 .btn-submit {
-    background-color: #f97316;
+    background-color: #f97316; /* 주황색 테마 */
     color: white;
 }
 .btn-submit:hover {
-    background-color: #ea580c;
+    background-color: #ea580c; /* 주황색 테마 */
 }
 .btn-submit-full {
     width: 100%;
-    background: linear-gradient(to right, #f97316, #ea580c);
+    background: linear-gradient(to right, #f97316, #ea580c); /* 주황색 그라데이션 */
     color: white;
     font-weight: 700;
     padding: 0.75rem;
@@ -840,7 +840,7 @@ body {
 .text-link {
     background: none;
     border: none;
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
     font-size: 14px;
     cursor: pointer;
     padding: 5px 10px;
@@ -860,14 +860,14 @@ body {
     padding: 0;
     cursor: pointer;
     text-align: left;
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
     font-size: 0.875rem;
     text-decoration: none;
     transition: color 0.2s;
 }
 .modal-footer-links a:hover,
 .modal-footer-links button.link-as-button:hover {
-    color: #ea580c;
+    color: #ea580c; /* 주황색 테마 */
     text-decoration: underline;
 }
 /* ===================================================================================
@@ -887,7 +887,7 @@ body {
     color: #2c3e50;
     margin-bottom: 1.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #f97316;
+    border-bottom: 2px solid #f97316; /* 주황색 테마 */
 }
 /* 채팅 로그 박스 */
 .chat-log-box {
@@ -943,7 +943,7 @@ body {
 }
 /* 내 메시지 버블 */
 .message-me .message-bubble {
-    background-color: #f97316;
+    background-color: #f97316; /* 주황색 테마 */
     color: white;
     border-bottom-right-radius: 2px;
 }
@@ -953,7 +953,7 @@ body {
     bottom: -5px;
     right: -15px;
     background-color: transparent;
-    color: #f97316;
+    color: #f97316; /* 주황색 테마 */
     font-size: 0.7rem;
     font-weight: 700;
     line-height: 1;
@@ -982,7 +982,7 @@ body {
 }
 .chat-textarea:focus {
     outline: none;
-    border-color: #f97316;
+    border-color: #f97316; /* 주황색 테마 */
 }
 .chat-send-btn {
     padding: 10px 20px;
@@ -1028,12 +1028,9 @@ body {
     background-color: #ef4444;
     color: white;
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 0.7rem;
+    width: 20px; /* 크기 조정 */
+    height: 20px; /* 크기 조정 */
+    font-size: 0.8rem; /* 크기 조정 */
     font-weight: 700;
     line-height: 1;
     transform: translate(50%, -50%);
@@ -1084,11 +1081,11 @@ body {
 }
 /* 5. 읽지 않은 알림 시각적 구분 */
 .dropdown-item.unread {
-    background-color: #fff7ed;
+    background-color: #fff7ed; /* 주황색 계열 */
     font-weight: 600;
 }
 .dropdown-item.unread:hover {
-    background-color: #ffedd5;
+    background-color: #ffedd5; /* 주황색 계열 */
 }
 .item-message {
     font-size: 0.95rem;
