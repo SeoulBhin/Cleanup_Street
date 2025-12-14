@@ -4,12 +4,34 @@ import { useParams } from "react-router-dom";
 
 export default function Chat() {
   const { roomId } = useParams();
+
+  const [roomName, setRoomName] = useState(roomId); // 기본값은 roomId
   const [logs, setLogs] = useState([]);
   const [msg, setMsg] = useState("");
   const socketRef = useRef(null);
 
+  // ✅ roomId로 roomName 가져오기
   useEffect(() => {
-    // 환경 변수에서 Socket URL을 가져옵니다.
+    let alive = true;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/gallery");
+        const list = await res.json();
+        const found = list.find((x) => x.roomId === roomId);
+        if (alive) setRoomName(found?.roomName || roomId);
+      } catch {
+        if (alive) setRoomName(roomId);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [roomId]);
+
+  // ✅ 소켓 연결 + 방 입장
+  useEffect(() => {
     const url =
       (typeof process !== "undefined" && process.env?.REACT_APP_SOCKET_URL) ||
       (typeof process !== "undefined" && process.env?.REACT_APP_API_BASE) ||
@@ -21,15 +43,17 @@ export default function Chat() {
     });
 
     socketRef.current = s;
+
     s.emit("join", { roomId });
-    
-    // 안 읽은 메시지 처리: 채팅방 진입 시 '읽음' 신호를 서버에 전송합니다.
-    s.emit("read_messages", { roomId }); 
+    s.emit("read_messages", { roomId });
 
     const onMsg = (m) => setLogs((prev) => [...prev, m]);
     s.on("msg", onMsg);
 
     return () => {
+      // (권장) 방 나가기 신호
+      s.emit("leave", { roomId });
+
       s.off("msg", onMsg);
       s.disconnect();
       socketRef.current = null;
@@ -38,8 +62,8 @@ export default function Chat() {
 
   const send = () => {
     if (!msg.trim() || !socketRef.current) return;
-    const payload = { roomId, text: msg, ts: Date.now() };
 
+    const payload = { roomId, text: msg, ts: Date.now() };
     socketRef.current.emit("msg", payload);
 
     setLogs((prev) => [...prev, { ...payload, from: "me" }]);
@@ -55,20 +79,21 @@ export default function Chat() {
 
   return (
     <div className="chat-page-container fade-in">
-      <h2 className="chat-title">채팅방: {roomId}</h2>
+      <h2 className="chat-title">채팅방: {roomName}</h2>
 
       <div className="chat-log-box">
         {logs.map((m, i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className={`chat-message ${m.from === "me" ? "message-me" : "message-other"}`}
           >
             <span className="message-time">
-              {new Date(m.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {new Date(m.ts || Date.now()).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
             <span className="message-bubble">{m.text ?? String(m)}</span>
-            {/* 안 읽은 메시지 배지 (실제로는 서버 데이터에 의존해야 함) */}
-            {/* <span className="unread-badge">1</span> */}
           </div>
         ))}
       </div>
