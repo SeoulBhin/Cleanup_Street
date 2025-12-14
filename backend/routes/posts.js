@@ -81,7 +81,10 @@ ${String(text || "")}
       "";
 
     const picked = pickFirstLine(raw);
-    if (!picked.trim()) return null;
+    if (!picked.trim()) {
+      console.warn("[GEMINI] empty response");
+      return null;
+    }
 
     const norm = normalizeCategory(picked);
     console.log("[GEMINI] response <-", { raw: picked, norm });
@@ -235,7 +238,23 @@ function classifyByKeywords(title, body) {
   if (has(["자연", "재난", "환경", "폭우", "침수", "홍수", "태풍", "지진", "미세먼지", "하수구", "역류"])) {
     return "자연재난-환경";
   }
-  if (has(["위생", "보건", "쓰레기", "폐기물", "악취", "벌레", "쥐", "식중독", "곰팡이"])) {
+  if (
+    has([
+      "위생",
+      "보건",
+      "쓰레기",
+      "폐기물",
+      "악취",
+      "벌레",
+      "쥐",
+      "설치류",
+      "흔적",
+      "배수로",
+      "봉투",
+      "식중독",
+      "곰팡이",
+    ])
+  ) {
     return "위생-보건";
   }
   if (has(["스팸", "spam", "세일", "광고", "홍보", "특가", "링크", "클릭"])) {

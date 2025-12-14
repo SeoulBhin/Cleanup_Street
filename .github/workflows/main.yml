@@ -43,6 +43,8 @@ jobs:
         with:
           context: ./backend
           push: true
+          cache-from: type=registry,ref=${{ env.BE_IMAGE }}:latest
+          cache-to: type=inline
           tags: |
             ${{ env.BE_IMAGE }}:${{ github.sha }}
             ${{ env.BE_IMAGE }}:latest
@@ -54,6 +56,8 @@ jobs:
           push: true
           build-args: |
             REACT_APP_API_BASE_URL=http://52.63.57.185
+          cache-from: type=registry,ref=${{ env.FE_IMAGE }}:latest
+          cache-to: type=inline
           tags: |
             ${{ env.FE_IMAGE }}:${{ github.sha }}
             ${{ env.FE_IMAGE }}:latest
