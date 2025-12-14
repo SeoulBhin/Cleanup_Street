@@ -12,3 +12,4 @@ datatest/kobert-6cls-out/
 datatest/kobert-6cls-overfit/
 datatest/kobert-7cls-artifacts/
 datatest/rule_api/kobert-7cls-artifacts/
+datatest/rule_api/.venv/
