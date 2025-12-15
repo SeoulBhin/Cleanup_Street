@@ -70,13 +70,19 @@ export default function RightMap() {
   }, []);
 
   // ✅ 스팸 제외 (지도에 보여줄 데이터만)
-  const mapItems = useMemo(() => {
-    return (items || []).filter((item) => item?.category !== "스팸");
-  }, [items]);
+const mapItems = useMemo(() => {
+  const filtered = (items || []).filter(
+    (item) => item?.category !== "스팸"
+  );
+
   console.log(
     "[RightMap] mapItems categories:",
     filtered.map((x) => x.category)
   );
+
+  return filtered;
+}, [items]);
+
   // bounds 계산 (스팸 제외된 mapItems 기준)
   const bounds = useMemo(() => {
     return mapItems
