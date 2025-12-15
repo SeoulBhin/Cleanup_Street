@@ -451,6 +451,7 @@ app.get("/api/map", async (req, res) => {
         p.title,
         p.content,
         p.address,
+        p.category,
         p.latitude  AS lat,
         p.longitude AS lng,
         p.h3_index::text AS h3_cell,
@@ -486,6 +487,7 @@ app.get("/api/map", async (req, res) => {
       ) content_img ON TRUE
       WHERE p.latitude  IS NOT NULL
         AND p.longitude IS NOT NULL
+        AND COALESCE(p.category, '') <> '스팸'   -- ✅ 스팸 제외 (NULL 안전)
       ORDER BY p.created_at DESC
       LIMIT 500
     `);
