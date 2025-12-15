@@ -5,11 +5,11 @@ import {
   Marker,
   Popup,
   useMap,
-  Polygon,        // ✅ 추가
+  Polygon,
 } from "react-leaflet";
 import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
 import L from "leaflet";
-import { latLngToCell, cellToBoundary } from "h3-js"; // ✅ v4용 H3 함수
+import { latLngToCell, cellToBoundary } from "h3-js";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
@@ -47,6 +47,7 @@ export default function RightMap() {
   // 지도 데이터 로딩
   useEffect(() => {
     let cancelled = false;
+
     async function load() {
       setLoading(true);
       setError(null);
@@ -54,29 +55,35 @@ export default function RightMap() {
         const res = await fetch("/api/map", { credentials: "include" });
         if (!res.ok) throw new Error("지도 데이터를 불러오지 못했습니다.");
         const data = await res.json();
-        if (!cancelled) setItems(data || []);
+        if (!cancelled) setItems(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) setError(err?.message || "알 수 없는 오류");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
+
     load();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // bounds 계산
+  // ✅ 스팸 제외 (지도에 보여줄 데이터만)
+  const mapItems = useMemo(() => {
+    return (items || []).filter((item) => item?.category !== "스팸");
+  }, [items]);
+
+  // bounds 계산 (스팸 제외된 mapItems 기준)
   const bounds = useMemo(() => {
-    return items
+    return mapItems
       .map((item) => {
-        const lat = parseFloat(item.lat);
-        const lng = parseFloat(item.lng);
+        const lat = parseFloat(item?.lat);
+        const lng = parseFloat(item?.lng);
         return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
       })
       .filter(Boolean);
-  }, [items]);
+  }, [mapItems]);
 
   const center = bounds[0] || [37.5665, 126.978]; // 서울 시청 기준
 
@@ -104,18 +111,18 @@ export default function RightMap() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* ✅ 핀 위치에 우버 H3 육각형(초록색, 작게) 표시 */}
-          {items.map((item) => {
-            const lat = parseFloat(item.lat);
-            const lng = parseFloat(item.lng);
+          {/* ✅ 핀 위치에 H3 육각형 표시 (스팸 제외된 mapItems만) */}
+          {mapItems.map((item) => {
+            const lat = parseFloat(item?.lat);
+            const lng = parseFloat(item?.lng);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-            // H3 인덱스 계산 (resolution 9: 도시 기준 적당한 크기)
+            // H3 인덱스 계산 (resolution 9: 도시 기준)
             const h3Index = latLngToCell(lat, lng, 9);
 
             // 육각형 꼭짓점 좌표 → Leaflet Polygon 좌표로 변환
             const hexBoundary = cellToBoundary(h3Index, true).map(
-              ([hLng, hLat]) => [hLat, hLng] // Leaflet은 [lat, lng]
+              ([hLng, hLat]) => [hLat, hLng]
             );
 
             return (
@@ -132,14 +139,14 @@ export default function RightMap() {
             );
           })}
 
-          {/* 🔵 마커/팝업 로직은 그대로 유지 (클러스터 안) */}
+          {/* ✅ 마커/팝업도 mapItems만 (스팸 제외) */}
           <MarkerClusterGroup chunkedLoading>
-            {items.map((item) => {
-              const lat = parseFloat(item.lat);
-              const lng = parseFloat(item.lng);
+            {mapItems.map((item) => {
+              const lat = parseFloat(item?.lat);
+              const lng = parseFloat(item?.lng);
               if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-              const imageUrl = item.image_url || FALLBACK_IMAGE;
+              const imageUrl = item?.image_url || FALLBACK_IMAGE;
 
               return (
                 <Marker
@@ -151,20 +158,20 @@ export default function RightMap() {
                       <div className="map-popup-thumb">
                         <img
                           src={imageUrl}
-                          alt={item.title || "신고 이미지"}
+                          alt={item?.title || "신고 이미지"}
                           loading="lazy"
                         />
                       </div>
                       <div className="map-popup-body">
-                        <h3>{item.title || "제목 없음"}</h3>
+                        <h3>{item?.title || "제목 없음"}</h3>
                         <p className="map-popup-meta">
-                          주소: {item.address || "미입력"}
+                          주소: {item?.address || "미입력"}
                         </p>
                         <p className="map-popup-meta">
                           위도: {lat.toFixed(6)}, 경도: {lng.toFixed(6)}
                         </p>
                         <p className="map-popup-desc">
-                          {item.content
+                          {item?.content
                             ? item.content.substring(0, 120)
                             : "내용 없음"}
                         </p>
