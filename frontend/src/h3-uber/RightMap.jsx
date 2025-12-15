@@ -73,7 +73,10 @@ export default function RightMap() {
   const mapItems = useMemo(() => {
     return (items || []).filter((item) => item?.category !== "스팸");
   }, [items]);
-
+  console.log(
+    "[RightMap] mapItems categories:",
+    filtered.map((x) => x.category)
+  );
   // bounds 계산 (스팸 제외된 mapItems 기준)
   const bounds = useMemo(() => {
     return mapItems
